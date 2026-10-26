@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "duration": 8.0,
+  "_note": "Hand-written sample timings.",
+  "words": [
+    {
+      "text": "Three",
+      "start": 0.3,
+      "end": 0.6
+    },
+    {
+      "text": "point",
+      "start": 0.6,
+      "end": 0.9
+    },
+    {
+      "text": "four",
+      "start": 0.9,
+      "end": 1.2
+    },
+    {
+      "text": "trillion",
+      "start": 1.2,
+      "end": 1.7
+    },
+    {
+      "text": "yen.",
+      "start": 1.7,
+      "end": 2.1
+    },
+    {
+      "text": "The",
+      "start": 2.4,
+      "end": 2.5
+    },
+    {
+      "text": "needle",
+      "start": 2.5,
+      "end": 2.9
+    },
+    {
+      "text": "hits",
+      "start": 2.9,
+      "end": 3.2
+    },
+    {
+      "text": "ninety.",
+      "start": 3.2,
+      "end": 3.8
+    },
+    {
+      "text": "On",
+      "start": 4.1,
+      "end": 4.2
+    },
+    {
+      "text": "the",
+      "start": 4.2,
+      "end": 4.3
+    },
+    {
+      "text": "fifteenth",
+      "start": 4.3,
+      "end": 4.9
+    },
+    {
+      "text": "at",
+      "start": 5.2,
+      "end": 5.3
+    },
+    {
+      "text": "four",
+      "start": 5.3,
+      "end": 5.6
+    },
+    {
+      "text": "thirty",
+      "start": 5.6,
+      "end": 6.0
+    },
+    {
+      "text": "read",
+      "start": 6.3,
+      "end": 6.6
+    },
+    {
+      "text": "the",
+      "start": 6.6,
+      "end": 6.7
+    },
+    {
+      "text": "fine",
+      "start": 6.7,
+      "end": 7.0
+    },
+    {
+      "text": "print.",
+      "start": 7.0,
+      "end": 7.5
+    }
+  ]
+}

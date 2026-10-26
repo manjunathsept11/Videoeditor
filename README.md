@@ -13,6 +13,7 @@ Deterministic, code-driven 3D engine for 9:16 explainer shorts. Full design: [do
 | `packages/agents` | Director -> Set Designer -> Scene Builder, validated and self-repairing; Claude API and local-CLI backends behind one interface |
 | `apps/render` | Headless renderer (Vite + Playwright -> PNG frames -> ffmpeg -> MP4, muxes the voiceover) and the `audio` CLI |
 | `examples/demo` | 4-shot sample project with hand-typed times |
+| `examples/props` | The five number props (counter, dial, calendar, clock, magnifier), each landing on a spoken word |
 | `examples/anchored` | Same shots authored against words (`"at": {"word": "gambling"}`) + a sample `audio/alignment.json` |
 
 ## Use
@@ -40,6 +41,22 @@ answer. Floor gaps are repaired deterministically at set level. `--provider cli`
 (`--cli gemini --cli-args "-p"`). `render` runs the gate first and refuses to render a broken project unless you pass `--force`.
 Captions come from the alignment (lower 30%, white with black stroke, 3 words per line) and can be switched off or given a
 highlight colour for the spoken word in `project.json` (`"captions": {"enabled": true, "highlight": "#ffe14a"}`).
+
+## Number props
+
+Numbers are physical objects, never text overlays. A shot lists `props` and `propEvents`; each event rolls a prop to its value so that it
+**first touches the value on the exact frame of the anchored word**, overshoots ~10% and settles (closed-form spring, started
+`springRiseTime` early, so any frame can be rendered on its own).
+
+| kind | event payload | behaviour |
+|:--|:--|:--|
+| `counter` | `value` | odometer drums; the ones drum rolls, higher drums only turn on the carry |
+| `dial` | `value` | gauge needle sweeping through min..max |
+| `calendar` | `value` (day 1-31) | hinged flap folds over to reveal the next day |
+| `clock` | `time` ("4:30") | hands whirl forward at least one full turn, then settle |
+| `magnifier` | `to` ([x, y] in -1..1) | lens glides over a document and magnifies the text under it |
+
+The quality gate checks props are fully in frame (including the camera creep) and clear of the caption zone.
 
 ## Voiceover workflow
 

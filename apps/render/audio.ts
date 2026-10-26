@@ -53,6 +53,10 @@ if (cmd === 'tighten') {
       const detail = e.type === 'gesture' ? `${e.gesture}/${e.hand}` : e.expression;
       console.log(`   ${e.type.padEnd(10)} ${e.actor.padEnd(5)} ${detail.padEnd(12)} word@${e.at.toFixed(3)}s (f${frame(e.at)})`);
     }
+    for (const e of s.propEvents) {
+      const what = e.value !== undefined ? `-> ${e.value}` : e.time ? `-> ${e.time}` : `-> lens (${e.to})`;
+      console.log(`   prop       ${e.prop.padEnd(5)} ${what.padEnd(12)} lands@${e.at.toFixed(3)}s (f${frame(e.at)})`);
+    }
   }
 } else {
   throw new Error('commands: tighten | import-whisper | check');

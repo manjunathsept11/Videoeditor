@@ -167,6 +167,23 @@ export function buildShot(provider: LlmProvider, input: BuildShotInput): Promise
           issues.push(`events[${k}] anchors "${e.at.word}" at ${t.toFixed(2)}s, outside this shot (${start.toFixed(2)}-${end.toFixed(2)}s); pick a word inside it`);
         }
       });
+      const propIds = new Map(s.props.map((p) => [p.id, p.kind]));
+      s.propEvents.forEach((e, k) => {
+        const kind = propIds.get(e.prop);
+        if (!kind) {
+          issues.push(`propEvents[${k}] targets unknown prop "${e.prop}"`);
+          return;
+        }
+        const need = kind === 'clock' ? 'time' : kind === 'magnifier' ? 'to' : 'value';
+        if (e[need] === undefined) issues.push(`propEvents[${k}] for the ${kind} "${e.prop}" needs "${need}"`);
+        if (typeof e.at === 'number') {
+          issues.push(`propEvents[${k}].at must be a word anchor, not seconds`);
+          return;
+        }
+        const t = resolveAnchor(alignment, e.at);
+        if (typeof t === 'string') issues.push(`propEvents[${k}]: ${t}`);
+        else if (t < start - 0.05 || t >= end + 0.05) issues.push(`propEvents[${k}] anchors "${e.at.word}" at ${t.toFixed(2)}s, outside this shot (${start.toFixed(2)}-${end.toFixed(2)}s)`);
+      });
       // geometric checks (framing, caption zone, blocked views, props) on the shot as it will be rendered
       issues.push(
         ...checkShot({ ...s, start, duration: Math.max(0.1, end - start), events: [], propEvents: [] }, set)

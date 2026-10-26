@@ -75,10 +75,25 @@ ${WORLD}
 
 ${ANCHORS}
 
+# Number props
+Numbers are physical objects here, never text overlays. Whenever the voiceover states an amount, count, date, time or level (or says to read fine print), put a prop in the shot and roll it to the value on the word that says it.
+ - counter: rolling odometer for amounts and counts. {"kind":"counter","id":"yen","position":[0,4,0],"digits":4,"prefix":"¥","suffix":"B","initial":0,"scale":0.8}. It shows whole numbers only: pick units so the value is whole (3.4 trillion yen = value 3400 with suffix "B").
+ - dial: gauge for risk, percentages and levels. {"kind":"dial","id":"risk","position":[0,4,0],"min":0,"max":100,"initial":10,"label":"RISK"}
+ - calendar: flip calendar showing a day of the month 1-31. {"kind":"calendar","id":"cal","position":[0,4,0],"initial":1,"month":"March"}
+ - clock: sweeping clock. {"kind":"clock","id":"clk","position":[0,4,0],"initial":"12:00"}
+ - magnifier: lens sliding over a document. {"kind":"magnifier","id":"mag","position":[0,4,0],"initial":[-0.6,0.7],"text":"line one\nline two"}
+ Place props above the actors' heads (y about 3.6-4.6, z about 0), inside the frame and above the caption zone. Size at scale 1: dial, clock, calendar and magnifier are about 1.7-1.9 wide; a counter is digits*0.5+0.5 wide plus 0.55 for each of prefix/suffix, so use scale 0.6-0.8 for four or more digits with affixes. The camera creeps in 5% per second, so leave margin on long shots.
+ propEvents roll a prop to its value so it lands exactly on the spoken word, then overshoots about 10% and settles:
+   {"prop":"yen","at":{"word":"trillion"},"value":3400}   (counter, dial, calendar: "value")
+   {"prop":"clk","at":{"word":"thirty"},"time":"4:30"}    (clock: "time")
+   {"prop":"mag","at":{"word":"print"},"to":[0.4,-0.5]}    (magnifier: "to", each -1..1)
+ Anchor to the word that says the number itself.
+
 # Shot JSON
  - id, set: copy from the storyboard shot. start: copy the anchor given. Omit duration (it runs to the next shot).
  - camera: {position:[x,y,z], target:[x,y,z], fov (36-46), creep: 0.05}. Frame for 9:16 as described above.
  - actors: [{id, bodyColor, position:[x,0,z], facingY, glasses}] copying id/bodyColor/glasses from the cast. Keep actors near z=0..1.5 in front of the set, x within the visible width.
+ - props and propEvents: see Number props above; omit both when the shot has no number.
  - events: gestures and expressions anchored to words:
      {"type":"gesture","actor":"ken","at":{"word":"gambling"},"gesture":"point"|"raise","hand":"left"|"right","hold":0.8}
      {"type":"expression","actor":"ken","at":{"word":"gambling"},"expression":"neutral"|"happy"|"panic"}

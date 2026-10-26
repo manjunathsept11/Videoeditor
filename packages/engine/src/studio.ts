@@ -3,6 +3,8 @@ import { projectDuration, type Bundle, type Shot } from '@shortstudio/schema';
 import { applyLighting, type LightRig } from './lighting';
 import { Mannequin } from './mannequin';
 import { actorPoseAt } from './pose';
+import { buildProp, type PropMesh } from './propMeshes';
+import { propStateAt } from './propState';
 import { resolveAt } from './resolve';
 import { cameraCreepScale } from './rules';
 import { CaptionOverlay } from './captionOverlay';
@@ -16,6 +18,7 @@ class ShotScene {
   readonly camera: THREE.PerspectiveCamera;
   private rig: LightRig;
   private actors: Mannequin[] = [];
+  private props: { def: Shot['props'][number]; mesh: PropMesh }[] = [];
   private toon: THREE.ShaderMaterial[] = [];
 
   constructor(private shot: Shot, bundle: Bundle, aspect: number) {
@@ -29,6 +32,12 @@ class ShotScene {
       this.actors.push(m);
       this.toon.push(...m.toonMaterials);
       this.scene.add(m.group);
+    }
+    for (const def of shot.props) {
+      const mesh = buildProp(def);
+      this.props.push({ def, mesh });
+      this.toon.push(...mesh.toonMaterials);
+      this.scene.add(mesh.group);
     }
     repairSceneNormals(this.scene);
     this.camera = new THREE.PerspectiveCamera(shot.camera.fov, aspect, 0.1, 200);
@@ -46,6 +55,7 @@ class ShotScene {
     this.camera.lookAt(...target);
     this.camera.updateMatrixWorld(true);
     for (const m of this.actors) m.applyPose(actorPoseAt(this.shot, m.actor.id, this.shot.start + localT));
+    for (const { def, mesh } of this.props) mesh.apply(propStateAt(this.shot, def, this.shot.start + localT));
     for (const mat of this.toon) updateWhiteLift(mat, this.rig, this.camera);
   }
 }

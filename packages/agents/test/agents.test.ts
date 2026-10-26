@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Alignment } from '@shortstudio/schema';
-import { CliProvider, GenerationError, extractJson, generateValidated, produceProject, type CompletionRequest, type LlmProvider } from '../src/index';
+import { CliProvider, GenerationError, SHOT_SYSTEM, extractJson, generateValidated, produceProject, type CompletionRequest, type LlmProvider } from '../src/index';
 
 // ---------------------------------------------------------------- json extraction
 describe('extractJson', () => {
@@ -158,5 +158,56 @@ describe('produceProject', () => {
     const bad = { ...storyboard, shots: [{ ...storyboard.shots[0]!, startWord: { word: 'pachinko' } }, storyboard.shots[1]!] };
     const p = new Scripted((req) => (req.system.includes('Director') ? JSON.stringify(bad) : ''));
     await expect(produceProject({ provider: p, script: 's', alignment })).rejects.toThrow(/"pachinko" not found/);
+  });
+});
+
+describe('Scene Builder and props', () => {
+  const propShot = (props: object[], propEvents: object[]) => ({
+    ...shotJson('shot_01', 'street', ['ken', 'mio'], goodCam, []),
+    props,
+    propEvents,
+  });
+  const counter = { kind: 'counter', id: 'yen', position: [0, 4, 0], digits: 2, scale: 0.8 };
+
+  const run = (responses: (n: number) => object) => {
+    let n = 0;
+    const base = studioResponder(() => goodCam);
+    return new Scripted((req) => {
+      if (req.system.includes('Scene Builder') && req.messages[0]!.content.includes('shot_01')) return JSON.stringify(responses(++n));
+      return base(req);
+    });
+  };
+
+  it('keeps a valid counter and anchors its event to a word in the shot', async () => {
+    const p = run(() => propShot([counter], [{ prop: 'yen', at: { word: 'gambling' }, value: 34 }]));
+    const r = await produceProject({ provider: p, script: 's', alignment });
+    expect(r.bundle.shots.shot_01!.props).toHaveLength(1);
+    expect(r.bundle.shots.shot_01!.propEvents[0]!.at).toBeCloseTo(0.9, 9);
+  });
+
+  it('sends back a prop event with the wrong payload, an unknown prop, or an anchor outside the shot', async () => {
+    const bad = propShot(
+      [{ kind: 'clock', id: 'clk', position: [0, 4, 0] }],
+      [{ prop: 'clk', at: { word: 'gambling' }, value: 3 }, { prop: 'ghost', at: { word: 'gambling' }, value: 1 }, { prop: 'clk', at: { word: 'legal' }, time: '3:00' }],
+    );
+    const good = propShot([{ kind: 'clock', id: 'clk', position: [0, 4, 0] }], [{ prop: 'clk', at: { word: 'gambling' }, time: '3:00' }]);
+    const p = run((n) => (n === 1 ? bad : good));
+    await produceProject({ provider: p, script: 's', alignment });
+    const repair = p.calls.find((c) => c.system.includes('Scene Builder') && c.messages.length === 3)!.messages.at(-1)!.content;
+    expect(repair).toMatch(/needs "time"/);
+    expect(repair).toMatch(/unknown prop "ghost"/);
+    expect(repair).toMatch(/outside this shot/);
+  });
+
+  it('sends back a prop that does not fit the frame', async () => {
+    const wide = propShot([{ kind: 'counter', id: 'yen', position: [0, 4, 0], digits: 6, prefix: '¥', suffix: 'B' }], []);
+    const p = run((n) => (n === 1 ? wide : propShot([counter], [])));
+    await produceProject({ provider: p, script: 's', alignment });
+    expect(p.calls.find((c) => c.system.includes('Scene Builder') && c.messages.length === 3)!.messages.at(-1)!.content).toMatch(/counter "yen" is cut off/);
+  });
+
+  it('documents props in the Scene Builder prompt', () => {
+    expect(SHOT_SYSTEM).toMatch(/counter/);
+    expect(SHOT_SYSTEM).toMatch(/propEvents/);
   });
 });

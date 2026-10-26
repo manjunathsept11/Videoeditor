@@ -134,3 +134,49 @@ describe('floor repair at set level', () => {
     expect(runQualityGate(b, { fix: true }).setPatches).toEqual({});
   });
 });
+
+describe('props in frame', () => {
+  const withProps = (props: object[]) =>
+    parseBundle({
+      project: { name: 't', sets: ['s'], shots: ['a'] },
+      sets: [set([ground])],
+      shots: [{ id: 'a', set: 's', start: 0, duration: 2, camera: cam, actors: [actor('a', [0, 0, 0])], props }],
+    });
+  const counter = (extra: object = {}) => ({ kind: 'counter', id: 'c', position: [0, 4.0, 0], digits: 4, ...extra });
+  it('passes a prop that fits above the actors, with room for the camera creep', () => {
+    const b = withProps([{ ...counter(), digits: 2, scale: 0.8 }]);
+    expect(checkShot(b.shots.a!, b.sets.s!).filter((i) => i.check.startsWith('prop-')).map((i) => i.check)).toEqual([]);
+  });
+  it('flags a counter wider than the frame', () => {
+    const b = withProps([counter({ digits: 6, prefix: '¥', suffix: 'B' })]);
+    expect(checkShot(b.shots.a!, b.sets.s!).map((i) => i.check)).toContain('prop-out-of-frame');
+  });
+  it('flags a prop pushed off the side', () => {
+    const b = withProps([{ kind: 'dial', id: 'd', position: [3.2, 3, 0] }]);
+    expect(checkShot(b.shots.a!, b.sets.s!).map((i) => i.check)).toContain('prop-out-of-frame');
+  });
+  it('flags a prop sitting in the caption zone', () => {
+    const b = withProps([{ kind: 'clock', id: 'k', position: [0, 0.3, 0] }]);
+    expect(checkShot(b.shots.a!, b.sets.s!).map((i) => i.check)).toContain('prop-under-caption');
+  });
+  it('scale matters: a too-wide counter fits when scaled down', () => {
+    const wide = { digits: 6, prefix: '¥', suffix: 'B' }; // 4.6 units wide: more than the ~3.7 visible at this distance
+    expect(checkShot(withProps([counter(wide)]).shots.a!, withProps([]).sets.s!).map((i) => i.check)).toContain('prop-out-of-frame');
+    const b = withProps([counter({ ...wide, scale: 0.6 })]);
+    expect(checkShot(b.shots.a!, b.sets.s!).map((i) => i.check)).not.toContain('prop-out-of-frame');
+  });
+});
+
+describe('props in frame: camera creep', () => {
+  it('a prop that fits at the start of a long shot is cut off by the end', () => {
+    const mk = (duration: number) =>
+      parseBundle({
+        project: { name: 't', sets: ['s'], shots: ['a'] },
+        sets: [set([ground])],
+        shots: [{ id: 'a', set: 's', start: 0, duration, camera: cam, actors: [actor('a', [0, 0, 0])], props: [{ kind: 'dial', id: 'd', position: [0.9, 3.2, 0] }] }], // right edge 1.75: inside the ~2.0 half-width at the start, outside the ~1.5 at the end
+      });
+    const short = mk(0.1), long = mk(8);
+    expect(checkShot(short.shots.a!, short.sets.s!).map((i) => i.check)).not.toContain('prop-out-of-frame');
+    expect(checkShot(long.shots.a!, long.sets.s!).map((i) => i.check)).toContain('prop-out-of-frame');
+  });
+});

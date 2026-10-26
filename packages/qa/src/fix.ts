@@ -1,6 +1,7 @@
 import type { Camera, SetDef, Shot } from '@shortstudio/schema';
 import { checkFraming, type Issue } from './framing';
 import { checkFloorCoverage } from './floor';
+import { checkPropsInFrame } from './propsInFrame';
 import { checkClipping, checkObjectOcclusion } from './props';
 
 export interface Patch {
@@ -20,7 +21,7 @@ const errors = (xs: Issue[]) => xs.filter((i) => i.severity === 'error');
 
 /** Every automated check on one shot. */
 export function checkShot(shot: Shot, set: SetDef): Issue[] {
-  return [...checkFraming(shot), ...checkObjectOcclusion(shot, set), ...checkClipping(shot, set), ...checkFloorCoverage(shot, set)];
+  return [...checkFraming(shot), ...checkObjectOcclusion(shot, set), ...checkClipping(shot, set), ...checkFloorCoverage(shot, set), ...checkPropsInFrame(shot)];
 }
 
 const withCamera = (s: Shot, camera: Camera): Shot => ({ ...s, camera });

@@ -1,0 +1,75 @@
+{
+  "id": "shot_01",
+  "set": "neon_street",
+  "start": 0,
+  "camera": {
+    "position": [
+      0,
+      2.4,
+      11.5
+    ],
+    "target": [
+      0,
+      2.2,
+      0
+    ],
+    "fov": 40
+  },
+  "actors": [
+    {
+      "id": "ken",
+      "bodyColor": "#ff7a1a",
+      "position": [
+        -1.0,
+        0,
+        0
+      ],
+      "facingY": 0.3
+    },
+    {
+      "id": "mio",
+      "bodyColor": "#7a4dff",
+      "position": [
+        1.0,
+        0,
+        0
+      ],
+      "facingY": -0.3,
+      "glasses": true
+    }
+  ],
+  "props": [
+    {
+      "kind": "counter",
+      "id": "yen",
+      "position": [
+        0,
+        4.6,
+        0
+      ],
+      "digits": 4,
+      "prefix": "¥",
+      "suffix": "B",
+      "initial": 0
+    }
+  ],
+  "propEvents": [
+    {
+      "prop": "yen",
+      "at": {
+        "word": "yen."
+      },
+      "value": 3400
+    }
+  ],
+  "events": [
+    {
+      "type": "expression",
+      "actor": "ken",
+      "at": {
+        "word": "trillion"
+      },
+      "expression": "panic"
+    }
+  ]
+}

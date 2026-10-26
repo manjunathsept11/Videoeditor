@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "Props demo",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "sets": [
+    "neon_street"
+  ],
+  "shots": [
+    "shot_01",
+    "shot_02",
+    "shot_03",
+    "shot_04",
+    "shot_05"
+  ],
+  "captions": {
+    "enabled": true,
+    "maxWords": 4
+  }
+}
