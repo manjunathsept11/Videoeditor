@@ -133,6 +133,16 @@ export function springValue(t: number, startT: number, from: number, to: number,
   return from + (to - from) * k;
 }
 
+/**
+ * Time for the step response to first reach its target. Start a spring this long before the
+ * spoken word and the value touches its target exactly on the word, then overshoots and settles.
+ */
+export function springRiseTime(opts: SpringOpts = {}): number {
+  const { zeta = 0.59, omega = 18 } = opts;
+  const wd = omega * Math.sqrt(1 - zeta * zeta);
+  return (Math.PI - Math.atan(Math.sqrt(1 - zeta * zeta) / zeta)) / wd;
+}
+
 /** Peak overshoot fraction of an underdamped spring. */
 export const springOvershoot = (zeta: number): number => Math.exp((-Math.PI * zeta) / Math.sqrt(1 - zeta * zeta));
 

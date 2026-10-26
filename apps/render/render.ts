@@ -4,6 +4,8 @@
  *   npm run render -- examples/demo out/demo.mp4 [--scale 0.5] [--fps 30]
  *   npm run render -- examples/demo out/f.png --frame 20 [--scale 0.5]
  *
+ * The quality gate runs first; errors stop the render unless --force is given.
+ *
  * If the project has audio/voiceover_tight.wav (or --audio is given) it is muxed in.
  * Word anchors resolve against audio/alignment.json.
  *
@@ -15,7 +17,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
+import { runQualityGate } from '@shortstudio/qa';
 import { loadProject } from './project';
+import { printGate } from './qa';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -36,6 +40,14 @@ async function main() {
   if (!projectDir || !outPath) throw new Error('usage: render <projectDir> <out.mp4|out.png> [--scale s] [--fps 30|60] [--frame n]');
 
   const { bundle, voiceover } = loadProject(projectDir);
+  const gate = runQualityGate(bundle);
+  if (gate.issues.length) {
+    console.log('quality gate:');
+    printGate(gate);
+  }
+  if (!gate.passed && !('force' in opt)) {
+    throw new Error(`quality gate failed; run \`npm run qa -- ${projectDir} --fix\` or pass --force to render anyway`);
+  }
   const scale = Number(opt.scale ?? 1);
   const fps = Number(opt.fps ?? bundle.project.fps);
   const width = Math.round((bundle.project.width * scale) / 2) * 2;

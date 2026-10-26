@@ -7,7 +7,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "render": "tsx apps/render/render.ts",
-    "audio": "tsx apps/render/audio.ts"
+    "audio": "tsx apps/render/audio.ts",
+    "qa": "tsx apps/render/qa.ts",
+    "produce": "tsx apps/render/produce.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

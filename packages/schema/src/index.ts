@@ -6,10 +6,10 @@ export * from './alignment';
 /** All timing rules are authored at this rate; JSON stores seconds, never frames. */
 export const CANONICAL_FPS = 30;
 
-const Vec3 = z.tuple([z.number(), z.number(), z.number()]);
+export const Vec3 = z.tuple([z.number(), z.number(), z.number()]);
 const Vec2 = z.tuple([z.number(), z.number()]);
-const Color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'expected #rrggbb');
-const Id = z.string().regex(/^[a-z0-9_]+$/, 'ids are lowercase a-z, 0-9, _');
+export const Color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'expected #rrggbb');
+export const Id = z.string().regex(/^[a-z0-9_]+$/, 'ids are lowercase a-z, 0-9, _');
 
 export const LightingPreset = z.enum(['cinema', 'clean']);
 export const ExpressionId = z.enum(['neutral', 'panic', 'happy']);
@@ -111,6 +111,82 @@ const makeActorEvent = <T extends z.ZodTypeAny>(time: T) =>
 export const ActorEvent = makeActorEvent(z.number());
 export const ActorEventSource = makeActorEvent(TimeRef);
 
+// ---------------------------------------------------------------- props
+
+/** Physical number objects: a value shown as a thing in the world, never as a text overlay. */
+export const PropDef = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('counter'),
+    id: Id,
+    position: Vec3,
+    rotationY: z.number().default(0),
+    scale: z.number().default(1),
+    digits: z.number().int().min(1).max(10).default(4),
+    prefix: z.string().default(''),
+    suffix: z.string().default(''),
+    initial: z.number().default(0),
+  }),
+  z.object({
+    kind: z.literal('dial'),
+    id: Id,
+    position: Vec3,
+    rotationY: z.number().default(0),
+    scale: z.number().default(1),
+    min: z.number().default(0),
+    max: z.number().default(100),
+    initial: z.number().default(0),
+    label: z.string().default(''),
+  }),
+  z.object({
+    kind: z.literal('calendar'),
+    id: Id,
+    position: Vec3,
+    rotationY: z.number().default(0),
+    scale: z.number().default(1),
+    /** Day number shown at the start (1-31). */
+    initial: z.number().int().min(1).max(31).default(1),
+    month: z.string().default(''),
+  }),
+  z.object({
+    kind: z.literal('clock'),
+    id: Id,
+    position: Vec3,
+    rotationY: z.number().default(0),
+    scale: z.number().default(1),
+    /** "HH:MM" the hands start on. */
+    initial: z.string().regex(/^\d{1,2}:\d{2}$/).default('12:00'),
+  }),
+  z.object({
+    kind: z.literal('magnifier'),
+    id: Id,
+    position: Vec3,
+    rotationY: z.number().default(0),
+    scale: z.number().default(1),
+    /** Lens start position on the document, in document units (-1..1). */
+    initial: Vec2.default([-0.6, 0.4]),
+    /** Lines drawn on the document so the lens has something to magnify. */
+    text: z.string().default(''),
+  }),
+]);
+
+const makePropEvent = <T extends z.ZodTypeAny>(time: T) =>
+  z.object({
+    prop: Id,
+    /** The spoken word the value must land on: the prop reaches it on exactly this frame. */
+    at: time,
+    /** counter / dial / calendar: the value to roll to. */
+    value: z.number().optional(),
+    /** clock: "HH:MM" to whirl to. */
+    time: z
+      .string()
+      .regex(/^\d{1,2}:\d{2}$/)
+      .optional(),
+    /** magnifier: where the lens slides to (-1..1). */
+    to: Vec2.optional(),
+  });
+export const PropEvent = makePropEvent(z.number());
+export const PropEventSource = makePropEvent(TimeRef);
+
 export const Camera = z.object({
   position: Vec3,
   target: Vec3,
@@ -129,6 +205,7 @@ const shotBase = {
   set: Id,
   camera: Camera,
   actors: z.array(Actor).default([]),
+  props: z.array(PropDef).default([]),
   transitionIn: Transition.default({ type: 'cut', frames: 6 }),
 };
 
@@ -138,6 +215,7 @@ export const Shot = z.object({
   start: z.number().nonnegative(),
   duration: z.number().positive(),
   events: z.array(ActorEvent).default([]),
+  propEvents: z.array(PropEvent).default([]),
 });
 
 /**
@@ -149,6 +227,7 @@ export const ShotSource = z.object({
   start: z.union([z.number().nonnegative(), Anchor]),
   duration: z.number().positive().optional(),
   events: z.array(ActorEventSource).default([]),
+  propEvents: z.array(PropEventSource).default([]),
 });
 
 // ---------------------------------------------------------------- project
@@ -162,6 +241,15 @@ export const Project = z.object({
   fps: z.union([z.literal(30), z.literal(60)]).default(30),
   sets: z.array(Id),
   shots: z.array(Id),
+  /** Word-timed captions in the lower 30%; only drawn when the project has an alignment. */
+  captions: z
+    .object({
+      enabled: z.boolean().default(true),
+      maxWords: z.number().int().positive().default(3),
+      /** Colour of the word currently being spoken. Omit for plain white. */
+      highlight: Color.optional(),
+    })
+    .default({ enabled: true, maxWords: 3 }),
 });
 
 export type Project = z.infer<typeof Project>;
@@ -174,12 +262,16 @@ export type TimeRef = z.infer<typeof TimeRef>;
 export type Actor = z.infer<typeof Actor>;
 export type ActorEvent = z.infer<typeof ActorEvent>;
 export type Camera = z.infer<typeof Camera>;
+export type PropDef = z.infer<typeof PropDef>;
+export type PropEvent = z.infer<typeof PropEvent>;
 export type ExpressionId = z.infer<typeof ExpressionId>;
 export type GestureKind = z.infer<typeof GestureKind>;
 export type LightingPreset = z.infer<typeof LightingPreset>;
 
 /** A fully resolved project: what the engine renders. */
 export interface Bundle {
+  /** Word timings the project was resolved against (drives captions). */
+  alignment?: Alignment;
   project: Project;
   sets: Record<string, SetDef>;
   shots: Record<string, Shot>;
@@ -233,9 +325,20 @@ export function parseBundle(
       if (!actorIds.has(e.actor)) issues.push(`shot "${shot.id}" event targets unknown actor "${e.actor}"`);
     }
     if (actorIds.size !== shot.actors.length) issues.push(`shot "${shot.id}" has duplicate actor ids`);
+    const props = new Map(shot.props.map((p) => [p.id, p]));
+    if (props.size !== shot.props.length) issues.push(`shot "${shot.id}" has duplicate prop ids`);
+    for (const e of shot.propEvents) {
+      const p = props.get(e.prop);
+      if (!p) {
+        issues.push(`shot "${shot.id}" propEvent targets unknown prop "${e.prop}"`);
+        continue;
+      }
+      const need = p.kind === 'clock' ? 'time' : p.kind === 'magnifier' ? 'to' : 'value';
+      if (e[need] === undefined) issues.push(`shot "${shot.id}" propEvent for ${p.kind} "${p.id}" needs "${need}"`);
+    }
   }
   if (issues.length) throw new BundleError(issues);
-  return { project, sets, shots };
+  return { project, sets, shots, alignment: opts.alignment };
 }
 
 /** Shots in timeline order. */

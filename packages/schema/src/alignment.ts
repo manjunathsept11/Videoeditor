@@ -107,7 +107,11 @@ export function resolveShots(
       const at = time(e.at, `shot "${src.id}" events[${k}]`);
       return at === undefined ? [] : [{ ...e, at } as Shot['events'][number]];
     });
-    shots[src.id] = { ...src, start, duration, events };
+    const propEvents = src.propEvents.flatMap((e, k) => {
+      const at = time(e.at, `shot "${src.id}" propEvents[${k}]`);
+      return at === undefined ? [] : [{ ...e, at }];
+    });
+    shots[src.id] = { ...src, start, duration, events, propEvents };
   });
   return { shots, issues };
 }

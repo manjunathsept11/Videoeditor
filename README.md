@@ -9,6 +9,8 @@ Deterministic, code-driven 3D engine for 9:16 explainer shorts. Full design: [do
 | `packages/schema` | zod schemas for `project.json`, `sets/*.json`, `shots/*.json` + cross-reference validation (`parseBundle`) |
 | `packages/engine` | The six animation rules as pure functions (`rules.ts`), pose/timeline resolution (no WebGL, unit-tested), and the Three.js layer (`Studio`, WhiteLift + inverted-hull shaders, mannequin, procedural set kit) |
 | `packages/audio` | Silence clamping (no pause > 0.2s) with a source-to-output time map, WAV I/O, WhisperX / whisper-timestamped importer |
+| `packages/qa` | Quality gate: framing/eye-line/caption-zone, blocked views, prop clipping, floor coverage; each with an auto-fix |
+| `packages/agents` | Director -> Set Designer -> Scene Builder, validated and self-repairing; Claude API and local-CLI backends behind one interface |
 | `apps/render` | Headless renderer (Vite + Playwright -> PNG frames -> ffmpeg -> MP4, muxes the voiceover) and the `audio` CLI |
 | `examples/demo` | 4-shot sample project with hand-typed times |
 | `examples/anchored` | Same shots authored against words (`"at": {"word": "gambling"}`) + a sample `audio/alignment.json` |
@@ -22,6 +24,22 @@ npm run typecheck
 npm run render -- examples/demo out/demo.mp4 --scale 0.5      # preview
 npm run render -- examples/demo out/f.png --frame 54 --scale 0.5   # single frame
 ```
+
+## Making a short from a script
+
+```bash
+# script + word timings -> project (Director, Set Designer, Scene Builder agents)
+npm run produce -- script.txt projects/x/audio/alignment.json projects/x --provider cli            # local `claude -p`
+npm run produce -- script.txt projects/x/audio/alignment.json projects/x --provider api            # Claude API (ANTHROPIC_API_KEY)
+npm run qa -- projects/x --fix        # auto-repair framing, blocked views, props, floor gaps; patches the JSON
+npm run render -- projects/x out/short.mp4
+```
+
+Every agent answer is validated against the schema and the quality gate; problems are shown back to the model so it repairs its own
+answer. Floor gaps are repaired deterministically at set level. `--provider cli` accepts any CLI that reads a prompt on stdin
+(`--cli gemini --cli-args "-p"`). `render` runs the gate first and refuses to render a broken project unless you pass `--force`.
+Captions come from the alignment (lower 30%, white with black stroke, 3 words per line) and can be switched off or given a
+highlight colour for the spoken word in `project.json` (`"captions": {"enabled": true, "highlight": "#ffe14a"}`).
 
 ## Voiceover workflow
 

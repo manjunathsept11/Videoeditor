@@ -5,6 +5,9 @@ import { Mannequin } from './mannequin';
 import { actorPoseAt } from './pose';
 import { resolveAt } from './resolve';
 import { cameraCreepScale } from './rules';
+import { CaptionOverlay } from './captionOverlay';
+import { buildCaptionLines, captionAt, type CaptionLine } from './captions';
+import { repairSceneNormals } from './normals';
 import { buildSetObject } from './setbuilder';
 import { updateWhiteLift } from './shaders';
 
@@ -27,6 +30,7 @@ class ShotScene {
       this.toon.push(...m.toonMaterials);
       this.scene.add(m.group);
     }
+    repairSceneNormals(this.scene);
     this.camera = new THREE.PerspectiveCamera(shot.camera.fov, aspect, 0.1, 200);
   }
 
@@ -62,6 +66,8 @@ export class Studio {
   private quadScene = new THREE.Scene();
   private quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   private quadMat: THREE.ShaderMaterial;
+  private captions: CaptionOverlay | undefined;
+  private captionLines: CaptionLine[] = [];
 
   constructor(readonly canvas: HTMLCanvasElement, readonly width: number, readonly height: number) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -82,6 +88,14 @@ export class Studio {
   load(bundle: Bundle): void {
     this.bundle = bundle;
     this.scenes.clear();
+    const c = bundle.project.captions;
+    if (bundle.alignment && c.enabled) {
+      this.captionLines = buildCaptionLines(bundle.alignment, { maxWords: c.maxWords });
+      this.captions = new CaptionOverlay(this.width, this.height, c.highlight);
+    } else {
+      this.captionLines = [];
+      this.captions = undefined;
+    }
   }
 
   get duration(): number {
@@ -106,6 +120,7 @@ export class Studio {
       s.apply(layers[0]!.localT);
       r.setRenderTarget(null);
       r.render(s.scene, s.camera);
+      this.captions?.render(r, captionAt(this.captionLines, t));
       return;
     }
     const [a, b] = layers as [(typeof layers)[number], (typeof layers)[number]];
@@ -120,5 +135,6 @@ export class Studio {
     this.quadMat.uniforms.uB!.value = this.rtB.texture;
     this.quadMat.uniforms.uMix!.value = b.alpha;
     r.render(this.quadScene, this.quadCam);
+    this.captions?.render(r, captionAt(this.captionLines, t));
   }
 }
