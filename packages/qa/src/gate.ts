@@ -1,4 +1,4 @@
-import type { Bundle, SetDef } from '@shortstudio/schema';
+import { effectiveSet, type Bundle, type SetDef } from '@shortstudio/schema';
 import { checkShot, fixShot, type Patch } from './fix';
 import { fixSetFloor } from './floor';
 import type { Issue } from './framing';
@@ -38,7 +38,7 @@ export function runQualityGate(bundle: Bundle, opts: { fix?: boolean } = {}): Ga
 
   for (const id of bundle.project.shots) {
     const shot = bundle.shots[id]!;
-    const set = sets[shot.set]!;
+    const set = effectiveSet(sets[shot.set]!, shot);
     if (opts.fix) {
       const r = fixShot(shot, set);
       if (r.fixes.length) {

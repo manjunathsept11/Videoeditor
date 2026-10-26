@@ -1,0 +1,35 @@
+appId: app.shortstudio.desktop
+productName: ShortStudio
+copyright: ShortStudio
+# Electron lives at the workspace root, so electron-builder cannot read its version from node_modules: pin it here
+# (keep in step with the electron version in the root package.json).
+electronVersion: 45.0.0
+directories:
+  output: ../../release
+files:
+  - dist-electron/**
+  - dist-renderer/**
+  - package.json
+# ffmpeg must exist as a real file to be run, so it is not packed into the asar archive
+asarUnpack:
+  - node_modules/ffmpeg-static/**
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ShortStudio-Setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+linux:
+  executableName: ShortStudio
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: AudioVideo
+  artifactName: ShortStudio-${version}.${ext}
+mac:
+  target: dmg
+  category: public.app-category.video

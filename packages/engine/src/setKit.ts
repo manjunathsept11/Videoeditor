@@ -58,10 +58,10 @@ function halo(): THREE.CanvasTexture {
   return (haloTex = tex(c));
 }
 const glowPlane = (w: number, h: number, color: string, opacity: number) =>
-  new THREE.Mesh(
+  Object.assign(new THREE.Mesh(
     new THREE.PlaneGeometry(w, h),
     new THREE.MeshBasicMaterial({ map: halo(), color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
-  );
+  ), { raycast: () => {} }); // glow is not clickable
 
 // ------------------------------------------------------------------- pachinko
 

@@ -283,12 +283,22 @@ export const Transition = z.object({
   frames: z.number().int().positive().default(6),
 });
 
+/**
+ * Changes to the shot's set that belong to this shot alone, so a click on any object can be edited by rewriting just
+ * this one shot file. An object whose id matches one in the set replaces it; a new id is added; `remove` deletes.
+ */
+export const SetOverrides = z.object({
+  remove: z.array(Id).default([]),
+  objects: z.array(SetObject).default([]),
+});
+
 const shotBase = {
   id: Id,
   set: Id,
   camera: Camera,
   actors: z.array(Actor).default([]),
   props: z.array(PropDef).default([]),
+  setOverrides: SetOverrides.default({ remove: [], objects: [] }),
   transitionIn: Transition.default({ type: 'cut', frames: 6 }),
 };
 
@@ -364,6 +374,7 @@ export type Actor = z.infer<typeof Actor>;
 export type ActorEvent = z.infer<typeof ActorEvent>;
 export type Camera = z.infer<typeof Camera>;
 export type PropDef = z.infer<typeof PropDef>;
+export type SetOverrides = z.infer<typeof SetOverrides>;
 export type PropEvent = z.infer<typeof PropEvent>;
 export type ExpressionId = z.infer<typeof ExpressionId>;
 export type GestureKind = z.infer<typeof GestureKind>;
@@ -429,6 +440,8 @@ export function parseBundle(
     for (const e of shot.events) {
       if (e.type === 'walk' && !(e.until > e.at)) issues.push(`shot "${shot.id}" walk by "${e.actor}" must end after it starts (until ${e.until} <= at ${e.at})`);
     }
+    const setIds = new Set(sets[shot.set]?.objects.map((o) => o.id));
+    for (const id of shot.setOverrides.remove) if (!setIds.has(id)) issues.push(`shot "${shot.id}" setOverrides.remove names "${id}", which is not an object of set "${shot.set}"`);
     const props = new Map(shot.props.map((p) => [p.id, p]));
     if (props.size !== shot.props.length) issues.push(`shot "${shot.id}" has duplicate prop ids`);
     for (const e of shot.propEvents) {
@@ -443,6 +456,16 @@ export function parseBundle(
   }
   if (issues.length) throw new BundleError(issues);
   return { project, sets, shots, alignment: opts.alignment };
+}
+
+/** The set as this shot sees it: the shared set with the shot's own removals, replacements and additions applied. */
+export function effectiveSet(set: SetDef, shot: { setOverrides: SetOverrides }): SetDef {
+  const { remove, objects } = shot.setOverrides;
+  if (remove.length === 0 && objects.length === 0) return set;
+  const replaced = new Map(objects.map((o) => [o.id, o]));
+  const kept = set.objects.filter((o) => !remove.includes(o.id)).map((o) => replaced.get(o.id) ?? o);
+  const existing = new Set(set.objects.map((o) => o.id));
+  return { ...set, objects: [...kept, ...objects.filter((o) => !existing.has(o.id) && !remove.includes(o.id))] };
 }
 
 /** Shots in timeline order. */

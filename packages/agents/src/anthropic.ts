@@ -4,6 +4,8 @@ import type { CompletionRequest, LlmProvider } from './provider';
 export interface AnthropicProviderOptions {
   /** Defaults to ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login` profile. */
   client?: Anthropic;
+  /** Used when no client is given. Omit to use the environment (ANTHROPIC_API_KEY, or an `ant auth login` profile). */
+  apiKey?: string;
   model?: string;
   effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 }
@@ -22,7 +24,7 @@ export class AnthropicProvider implements LlmProvider {
   private effort: NonNullable<AnthropicProviderOptions['effort']>;
 
   constructor(opts: AnthropicProviderOptions = {}) {
-    this.client = opts.client ?? new Anthropic();
+    this.client = opts.client ?? new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {});
     this.model = opts.model ?? 'claude-opus-5-5';
     this.effort = opts.effort ?? 'medium';
     this.name = `anthropic:${this.model}`;

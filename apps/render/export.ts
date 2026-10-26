@@ -7,13 +7,11 @@
  * it, VP9/AV1 otherwise) muxed with mp4-muxer. Audio: voiceover is the 0 LU anchor, hits -10 LU, whooshes -15 LU, music
  * -18 LU with no ducking, master -14 LUFS at -1 dBTP. ffmpeg only attaches the audio (copying H.264 as-is).
  */
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { encodeWavStereo16 } from '@shortstudio/audio';
 import { runQualityGate } from '@shortstudio/qa';
-import { describeMix, mixProject } from './mixproject';
+import { finishExport } from './finishExport';
 import { loadProject } from './project';
 import { printGate } from './qa';
 import { openStudio, parseArgs } from './session';
@@ -64,25 +62,13 @@ async function main() {
     }
     console.log(`\nvideo   ${summary.frames} frames @ ${fps}fps ${width}x${height}, ${summary.codec} (${(summary.bytes / 1e6).toFixed(1)} MB) in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 
-    // ---- audio
-    const m = mixProject(projectDir, bundle, voiceover, { music: opt.music, noAuto: 'no-auto' in opt, noSfx: 'no-sfx' in opt, maxSfxPerMinute: opt['max-sfx'] ? Number(opt['max-sfx']) : undefined });
-    for (const l of describeMix(m)) console.log(l);
-    const reportPath = outPath.replace(/\.mp4$/i, '') + '.mix.json';
-    writeFileSync(reportPath, JSON.stringify(m.report, (_, v) => (v === -Infinity ? null : v), 2));
-
-    // ---- attach
-    const args = ['-y', '-loglevel', 'error', '-i', videoPath];
-    if (m.hasAudio) {
-      const wav = join(work, 'master.wav');
-      writeFileSync(wav, encodeWavStereo16(m.master, m.master));
-      args.push('-i', wav);
-    }
-    args.push('-c:v', summary.mux === 'avc' ? 'copy' : 'libx264', ...(summary.mux === 'avc' ? [] : ['-pix_fmt', 'yuv420p', '-crf', '16']));
-    if (m.hasAudio) args.push('-c:a', 'aac', '-b:a', '192k', '-shortest');
-    args.push('-movflags', '+faststart', outPath);
-    const r = spawnSync('ffmpeg', args, { encoding: 'utf8' });
-    if (r.status !== 0) throw new Error(`ffmpeg failed: ${r.stderr}`);
-    console.log(`wrote ${outPath} (${m.hasAudio ? 'with audio' : 'no audio'}) and ${reportPath}`);
+    // ---- audio + attach
+    const done = finishExport({
+      projectDir, bundle, voiceover, videoPath, mux: summary.mux, outPath,
+      mixOptions: { music: opt.music, noAuto: 'no-auto' in opt, noSfx: 'no-sfx' in opt, maxSfxPerMinute: opt['max-sfx'] ? Number(opt['max-sfx']) : undefined },
+    });
+    for (const l of done.lines) console.log(l);
+    console.log(`wrote ${outPath} (${done.mix.hasAudio ? 'with audio' : 'no audio'}) and ${done.reportPath}`);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

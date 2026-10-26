@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { projectDuration, type Bundle, type Shot } from '@shortstudio/schema';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { effectiveSet, projectDuration, type Bundle, type Shot } from '@shortstudio/schema';
 import { applyLighting, type LightRig } from './lighting';
 import { Mannequin } from './mannequin';
 import { actorPoseAt } from './pose';
@@ -14,6 +17,17 @@ import { PostChain } from './post';
 import { buildSetObject } from './setbuilder';
 import { updateWhiteLift } from './shaders';
 
+export interface Pick {
+  kind: 'actor' | 'prop' | 'set';
+  id: string;
+}
+
+export interface PickResult extends Pick {
+  shotId: string;
+  point: [number, number, number];
+  distance: number;
+}
+
 class ShotScene {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -24,10 +38,11 @@ class ShotScene {
 
   readonly post: PostChain | undefined;
   private focus = 10;
+  private selection: { ref: Pick; lines: LineSegments2; material: LineMaterial } | undefined;
 
   constructor(private shot: Shot, bundle: Bundle, renderer: THREE.WebGLRenderer, width: number, height: number) {
     const aspect = width / height;
-    const set = bundle.sets[shot.set]!;
+    const set = effectiveSet(bundle.sets[shot.set]!, shot);
     this.scene.background = new THREE.Color(set.background);
     if (set.fog) this.scene.fog = new THREE.Fog(set.fog.color, set.fog.near, set.fog.far);
     this.rig = applyLighting(this.scene, set.lighting);
@@ -48,6 +63,63 @@ class ShotScene {
     this.camera = new THREE.PerspectiveCamera(shot.camera.fov, aspect, 0.1, 200);
     const look = bundle.project.look;
     if (look.bloom || look.dof) this.post = new PostChain(renderer, this.scene, this.camera, width, height, look);
+  }
+
+  /** The clickable thing (actor, prop or set object) with this id, or undefined. */
+  private target(ref: Pick): THREE.Object3D | undefined {
+    return this.scene.children.find((o) => o.userData.pick?.kind === ref.kind && o.userData.pick?.id === ref.id);
+  }
+
+  /** Raycast from the camera through NDC (x, y); the nearest clickable thing, if any. */
+  pick(x: number, y: number): { ref: Pick; point: THREE.Vector3; distance: number } | null {
+    this.scene.updateMatrixWorld(true); // three only does this while rendering; a click can arrive before any frame
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(x, y), this.camera);
+    for (const hit of ray.intersectObjects(this.scene.children, true)) {
+      for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) {
+        const p = o.userData.pick as Pick | undefined;
+        if (p) return { ref: { kind: p.kind, id: p.id }, point: hit.point, distance: hit.distance };
+      }
+    }
+    return null;
+  }
+
+  /** A glowing box around the selected object (editor only; never drawn by an export). */
+  setSelection(ref: Pick | null, size: { width: number; height: number }): void {
+    if (this.selection) {
+      this.scene.remove(this.selection.lines);
+      this.selection.lines.geometry.dispose();
+      this.selection.material.dispose();
+      this.selection = undefined;
+    }
+    if (!ref) return;
+    const material = new LineMaterial({ linewidth: 3, color: 0xffffff, toneMapped: false, depthTest: false, transparent: true });
+    material.color.setRGB(0.1, 1.5, 1.9); // just brighter than white, so bloom gives it a soft glow without swamping the shot
+    material.resolution.set(size.width, size.height);
+    const lines = new LineSegments2(new LineSegmentsGeometry(), material);
+    lines.renderOrder = 999;
+    lines.raycast = () => {};
+    this.scene.add(lines);
+    this.selection = { ref, lines, material };
+    this.updateSelection();
+  }
+
+  private updateSelection(): void {
+    const sel = this.selection;
+    if (!sel) return;
+    const obj = this.target(sel.ref);
+    if (!obj) return void (sel.lines.visible = false);
+    const box = new THREE.Box3().setFromObject(obj).expandByScalar(0.06);
+    const { min: a, max: b } = box;
+    const c = [[a.x, a.y, a.z], [b.x, a.y, a.z], [b.x, a.y, b.z], [a.x, a.y, b.z], [a.x, b.y, a.z], [b.x, b.y, a.z], [b.x, b.y, b.z], [a.x, b.y, b.z]];
+    const edges: [number, number][] = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+    sel.lines.geometry.setPositions(edges.flatMap(([i, j]) => [...c[i]!, ...c[j]!]));
+    sel.lines.visible = true;
+  }
+
+  dispose(): void {
+    this.setSelection(null, { width: 1, height: 1 });
+    this.post?.dispose();
   }
 
   /** Distance from the camera to the actors (the point to keep sharp). */
@@ -78,6 +150,7 @@ class ShotScene {
     this.focus = this.camera.position.distanceTo(aim);
     for (const { def, mesh } of this.props) mesh.apply(propStateAt(this.shot, def, this.shot.start + localT));
     for (const mat of this.toon) updateWhiteLift(mat, this.rig, this.camera);
+    this.updateSelection();
   }
 }
 
@@ -117,8 +190,47 @@ export class Studio {
   }
 
   load(bundle: Bundle): void {
-    this.bundle = bundle;
+    for (const s of this.scenes.values()) s.dispose();
     this.scenes.clear();
+    this.bundle = bundle;
+    this.setupCaptions(bundle);
+  }
+
+  /**
+   * Hot reload: swap in an updated bundle and rebuild only the named shots' scenes (all of them when none are
+   * named). Every other shot keeps its scene, so a one-shot edit costs one scene build.
+   */
+  updateBundle(bundle: Bundle, changed?: string[]): void {
+    this.bundle = bundle;
+    for (const id of changed ?? [...this.scenes.keys()]) {
+      this.scenes.get(id)?.dispose();
+      this.scenes.delete(id);
+    }
+    if (this.selected && !bundle.shots[this.selected.shotId]) this.selected = undefined;
+    this.setupCaptions(bundle);
+  }
+
+  private selected: (Pick & { shotId: string }) | undefined;
+
+  /** What is under NDC point (x, y) (-1..1, y up) at timeline time `t`: the topmost shot's nearest clickable thing. */
+  pick(t: number, x: number, y: number): PickResult | null {
+    const layers = resolveAt(this.bundle!, t);
+    const top = layers[layers.length - 1];
+    if (!top) return null;
+    const scene = this.sceneFor(top.shotId);
+    scene.apply(top.localT);
+    const hit = scene.pick(x, y);
+    return hit ? { ...hit.ref, shotId: top.shotId, point: hit.point.toArray() as [number, number, number], distance: hit.distance } : null;
+  }
+
+  /** Draw (or clear, with null) the glowing selection box. Editor only: an export never calls this. */
+  highlight(ref: (Pick & { shotId: string }) | null): void {
+    if (this.selected) this.scenes.get(this.selected.shotId)?.setSelection(null, this);
+    this.selected = ref ?? undefined;
+    if (ref) this.sceneFor(ref.shotId).setSelection(ref, this);
+  }
+
+  private setupCaptions(bundle: Bundle): void {
     const c = bundle.project.captions;
     if (bundle.alignment && c.enabled) {
       this.captionLines = buildCaptionLines(bundle.alignment, { maxWords: c.maxWords });

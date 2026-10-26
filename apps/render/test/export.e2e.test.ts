@@ -3,7 +3,7 @@
  * ffprobe and ffmpeg's ebur128, which are independent of our code. Slow (launches a browser), so it lives behind
  * `npm run test:e2e` rather than the default unit run.
  */
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -14,10 +14,18 @@ const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 
 describe.skipIf(!hasFfmpeg)('export end to end', () => {
   const out = join(mkdtempSync(join(tmpdir(), 'e2e-')), 'rig.mp4');
-  let run: ReturnType<typeof spawnSync>;
-  beforeAll(() => {
-    run = spawnSync('npx', ['tsx', 'apps/render/export.ts', 'examples/rig', out, '--scale', '0.2', '--fps', '30', '--max-sfx', '60'], { cwd: root, encoding: 'utf8', timeout: 170_000 });
-  });
+  let run: { status: number | null; stdout: string; stderr: string };
+  // async, not spawnSync: blocking the worker for a minute makes vitest's runner miss its heartbeat and report an unhandled error
+  beforeAll(async () => {
+    run = await new Promise((resolveRun) => {
+      const child = spawn('npx', ['tsx', 'apps/render/export.ts', 'examples/rig', out, '--scale', '0.2', '--fps', '30', '--max-sfx', '60'], { cwd: root });
+      let stdout = '', stderr = '';
+      child.stdout.on('data', (d) => (stdout += d));
+      child.stderr.on('data', (d) => (stderr += d));
+      const timer = setTimeout(() => child.kill('SIGKILL'), 170_000);
+      child.on('close', (status) => { clearTimeout(timer); resolveRun({ status, stdout, stderr }); });
+    });
+  }, 180_000);
 
   it('exports without error', () => {
     expect(run.status, String(run.stderr) + String(run.stdout)).toBe(0);

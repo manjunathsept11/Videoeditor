@@ -85,3 +85,44 @@ describe('parseBundle with anchors', () => {
     expect(() => parseBundle(base(s), { alignment })).toThrow(/non-positive duration/);
   });
 });
+
+describe('per-shot set overrides', () => {
+  const cam2 = { position: [0, 1.8, 10], target: [0, 1.6, 0], fov: 40 };
+  const base = (overrides: object) => ({
+    project: { name: 't', sets: ['s'], shots: ['a', 'b'] },
+    sets: [{ id: 's', background: '#000000', objects: [
+      { kind: 'floor', id: 'ground', size: [40, 40], color: '#222222' },
+      { kind: 'sign', id: 'sign', position: [0, 3, -4], size: [3, 1], text: 'OLD', color: '#ff00ff' },
+      { kind: 'box', id: 'crate', position: [2, 0.5, -3], size: [1, 1, 1], color: '#664422' },
+    ] }],
+    shots: [
+      { id: 'a', set: 's', start: 0, duration: 2, camera: cam2, setOverrides: overrides },
+      { id: 'b', set: 's', start: 2, duration: 2, camera: cam2 },
+    ],
+  });
+
+  it('replaces, adds and removes objects for one shot only', async () => {
+    const { effectiveSet } = await import('../src/index');
+    const b = parseBundle(base({
+      remove: ['crate'],
+      objects: [
+        { kind: 'sign', id: 'sign', position: [1, 3, -4], size: [3, 1], text: 'NEW', color: '#00ffff' },
+        { kind: 'lantern', id: 'extra', position: [0, 4, -3] },
+      ],
+    }));
+    const a = effectiveSet(b.sets.s!, b.shots.a!);
+    expect(a.objects.map((o) => o.id)).toEqual(['ground', 'sign', 'extra']);
+    expect((a.objects.find((o) => o.id === 'sign') as { text: string }).text).toBe('NEW');
+    // the shared set and the other shot are untouched
+    expect(b.sets.s!.objects.map((o) => o.id)).toEqual(['ground', 'sign', 'crate']);
+    expect(effectiveSet(b.sets.s!, b.shots.b!)).toBe(b.sets.s);
+  });
+  it('does not resurrect a removed object that an override also lists', async () => {
+    const { effectiveSet } = await import('../src/index');
+    const b = parseBundle(base({ remove: ['crate'], objects: [{ kind: 'box', id: 'crate', position: [0, 0.5, 0], size: [1, 1, 1], color: '#ffffff' }] }));
+    expect(effectiveSet(b.sets.s!, b.shots.a!).objects.map((o) => o.id)).not.toContain('crate');
+  });
+  it('rejects removing an object the set does not have', () => {
+    expect(() => parseBundle(base({ remove: ['ghost'] }))).toThrow(/"ghost", which is not an object of set "s"/);
+  });
+});

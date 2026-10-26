@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import {
-  Alignment, Anchor, Color, Id, SetDef, ShotSource, normalizeToken, resolveAnchor,
+  Alignment, Anchor, Color, Id, SetDef, ShotSource, effectiveSet, normalizeToken, resolveAnchor,
   type SetDef as SetDefT, type ShotSource as ShotSourceT,
 } from '@shortstudio/schema';
-import { checkShot } from '@shortstudio/qa';
 import { generateValidated } from './generate';
+import { checkShotSource } from './shotChecks';
 import { DIRECTOR_SYSTEM, SET_SYSTEM, SHOT_SYSTEM } from './prompts';
 import type { LlmProvider } from './provider';
 
@@ -155,50 +155,7 @@ export function buildShot(provider: LlmProvider, input: BuildShotInput): Promise
       const ids = new Set(s.actors.map((a) => a.id));
       for (const a of plan.actors) if (!ids.has(a)) issues.push(`actor "${a}" from the storyboard is missing`);
       for (const a of s.actors) if (!plan.actors.includes(a.id)) issues.push(`actor "${a.id}" is not in this shot's storyboard`);
-      s.events.forEach((e, k) => {
-        if (!ids.has(e.actor)) issues.push(`events[${k}] targets unknown actor "${e.actor}"`);
-        if (typeof e.at === 'number') {
-          issues.push(`events[${k}].at must be a word anchor, not seconds`);
-          return;
-        }
-        const t = resolveAnchor(alignment, e.at);
-        if (typeof t === 'string') issues.push(`events[${k}]: ${t}`);
-        else if (t < start - 0.05 || t >= end + 0.05) {
-          issues.push(`events[${k}] anchors "${e.at.word}" at ${t.toFixed(2)}s, outside this shot (${start.toFixed(2)}-${end.toFixed(2)}s); pick a word inside it`);
-        }
-        if (e.type === 'walk') {
-          if (typeof e.until === 'number') issues.push(`events[${k}].until must be a word anchor, not seconds`);
-          else {
-            const u = resolveAnchor(alignment, e.until);
-            if (typeof u === 'string') issues.push(`events[${k}].until: ${u}`);
-            else if (typeof t === 'number' && u <= t) issues.push(`events[${k}] walk ends at ${u.toFixed(2)}s, not after it starts at ${t.toFixed(2)}s`);
-          }
-        }
-      });
-      const propIds = new Map(s.props.map((p) => [p.id, p.kind]));
-      s.propEvents.forEach((e, k) => {
-        const kind = propIds.get(e.prop);
-        if (!kind) {
-          issues.push(`propEvents[${k}] targets unknown prop "${e.prop}"`);
-          return;
-        }
-        const need = kind === 'clock' ? 'time' : kind === 'magnifier' ? 'to' : 'value';
-        if (e[need] === undefined) issues.push(`propEvents[${k}] for the ${kind} "${e.prop}" needs "${need}"`);
-        if (typeof e.at === 'number') {
-          issues.push(`propEvents[${k}].at must be a word anchor, not seconds`);
-          return;
-        }
-        const t = resolveAnchor(alignment, e.at);
-        if (typeof t === 'string') issues.push(`propEvents[${k}]: ${t}`);
-        else if (t < start - 0.05 || t >= end + 0.05) issues.push(`propEvents[${k}] anchors "${e.at.word}" at ${t.toFixed(2)}s, outside this shot (${start.toFixed(2)}-${end.toFixed(2)}s)`);
-      });
-      // geometric checks (framing, caption zone, blocked views, props) on the shot as it will be rendered
-      issues.push(
-        ...checkShot({ ...s, start, duration: Math.max(0.1, end - start), events: [], propEvents: [] }, set)
-          // a floor gap is the set's problem; the pipeline repairs the set deterministically, a shot can't
-          .filter((x) => x.severity === 'error' && x.check !== 'floor-gap')
-          .map((x) => x.message),
-      );
+      issues.push(...checkShotSource(s, { set, start, end, alignment }));
       return issues;
     },
   }).then((s) => ({ ...s, start: i === 0 ? 0 : plan.startWord, duration: undefined, transitionIn: { type: plan.transition, frames: s.transitionIn.frames } }));

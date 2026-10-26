@@ -51,11 +51,8 @@ Rules:
  - Reuse sets across shots. Use "dissolve" when time or place changes, otherwise "cut".
  - 1-3 actors per shot; keep the cast small (2-4 characters) and consistent.`;
 
-export const SET_SYSTEM = `You are the Set Designer of an automated studio. You build one 3D set as JSON from procedural primitives.
-
-${WORLD}
-
-# Available objects (kind)
+/** The objects a set can contain, with the rules for using them. Shared by the Set Designer and the shot editor. */
+export const SET_OBJECTS_DOC = `# Available objects (kind)
  - floor: {kind:"floor", id, size:[w,d], color, position?}. It MUST reach from behind the camera to the back wall: the bottom of the frame must never show empty void. Use size [40,40] with position [0,0,-6] (covers z=+14 to -26), and never a floor that stops short of the camera.
  - box: {kind:"box", id, position:[x,y,z], size:[w,h,d], color, emissive?, emissiveIntensity?, windows?}. position is the box CENTRE, so y = height/2 sits it on the floor. windows:true draws a lit-window grid on its +z face: use for buildings.
  - sign: {kind:"sign", id, position, size:[w,h], text, color, background?, rotationY?, glow?}. Neon text sign facing +z; Japanese text is supported.
@@ -68,7 +65,13 @@ ${WORLD}
  - lantern: {kind:"lantern", id, position:[x,y,z] (centre; hang it high, y 4-6), scale?, color?, text? (one kanji)}. Glowing paper lantern.
  - vending: {kind:"vending", id, position:[x,0,z], rotationY?, scale?, color?}. Lit drinks vending machine, 0.9 wide and 1.8 tall.
  - streetlight: {kind:"streetlight", id, position:[x,0,z], scale?, light? (true adds a real point light)}. 4.2 tall lamp post with a glowing head.
- Keep props out of the actors' spot (x within +-2, z from -1 to +3 is where the actors stand) and never inside each other.
+ Keep props out of the actors' spot (x within +-2, z from -1 to +3 is where the actors stand) and never inside each other.`;
+
+export const SET_SYSTEM = `You are the Set Designer of an automated studio. You build one 3D set as JSON from procedural primitives.
+
+${WORLD}
+
+${SET_OBJECTS_DOC}
 Set fields: id, lighting ("cinema" = warm key/cool fill/cyan rim, or "clean"), background (sky colour), fog {color, near, far} matching the background.
 
 Build depth: foreground clear for actors (z from -1 to +3), midground props and buildings at z -3 to -12, a back wall near z=-14..-20.
@@ -78,13 +81,8 @@ Everything must be readable from a camera at z~8-12 looking toward -z. Give at l
 Return ONE JSON object matching this schema and nothing else:
 ${schemaText(SetDef)}`;
 
-export const SHOT_SYSTEM = `You are the Scene Builder of an automated studio. You turn one storyboard shot into shot JSON.
-
-${WORLD}
-
-${ANCHORS}
-
-# Number props
+/** Number props and their events. Shared by the Scene Builder and the shot editor. */
+export const PROPS_DOC = `# Number props
 Numbers are physical objects here, never text overlays. Whenever the voiceover states an amount, count, date, time or level (or says to read fine print), put a prop in the shot and roll it to the value on the word that says it.
  - counter: rolling odometer for amounts and counts. {"kind":"counter","id":"yen","position":[0,4,0],"digits":4,"prefix":"¥","suffix":"B","initial":0,"scale":0.8}. It shows whole numbers only: pick units so the value is whole (3.4 trillion yen = value 3400 with suffix "B").
  - dial: gauge for risk, percentages and levels. {"kind":"dial","id":"risk","position":[0,4,0],"min":0,"max":100,"initial":10,"label":"RISK"}
@@ -96,13 +94,10 @@ Numbers are physical objects here, never text overlays. Whenever the voiceover s
    {"prop":"yen","at":{"word":"trillion"},"value":3400}   (counter, dial, calendar: "value")
    {"prop":"clk","at":{"word":"thirty"},"time":"4:30"}    (clock: "time")
    {"prop":"mag","at":{"word":"print"},"to":[0.4,-0.5]}    (magnifier: "to", each -1..1)
- Anchor to the word that says the number itself.
+ Anchor to the word that says the number itself.`;
 
-# Shot JSON
- - id, set: copy from the storyboard shot. start: copy the anchor given. Omit duration (it runs to the next shot).
- - camera: {position:[x,y,z], target:[x,y,z], fov (36-46), creep: 0.05}. Frame for 9:16 as described above.
- - actors: [{id, bodyColor, position:[x,0,z], facingY, glasses}] copying id/bodyColor/glasses from the cast. Keep actors near z=0..1.5 in front of the set, x within the visible width.
- - props and propEvents: see Number props above; omit both when the shot has no number.
+/** Actor events (gestures, expressions, walks, jolts). Shared by the Scene Builder and the shot editor. */
+export const EVENTS_DOC = `# Actor events
  - events: gestures and expressions anchored to words:
      {"type":"gesture","actor":"ken","at":{"word":"gambling"},"gesture":"point"|"raise","hand":"left"|"right","hold":0.8}
      {"type":"expression","actor":"ken","at":{"word":"gambling"},"expression":"neutral"|"happy"|"panic"}
@@ -110,9 +105,53 @@ Numbers are physical objects here, never text overlays. Whenever the voiceover s
      {"type":"jolt","actor":"ken","at":{"word":"legal"},"height":0.5}
    walk: the actor walks a straight line from where they stand to [x,z], starting on the "at" word and arriving by the "until" word (anchor both). They face the direction of travel and turn back on arrival; "turn":false strafes without turning. Feet are planted by IK, so a walk must not be too fast: allow about 0.6 seconds per unit of distance or more (3 units needs 1.8s+). Never walk through props, and keep the whole path inside the frame (the camera creeps in).
    jolt: a shock reaction; the actor jumps 50% of a head height in two frames on the word. Pair it with a "panic" expression.
-   An expression change blinks in 2 frames then snaps, so use them sparingly on emotional beats. Idle actors stay perfectly still on purpose.
+   An expression change blinks in 2 frames then snaps, so use them sparingly on emotional beats. Idle actors stay perfectly still on purpose.`;
+
+export const SHOT_SYSTEM = `You are the Scene Builder of an automated studio. You turn one storyboard shot into shot JSON.
+
+${WORLD}
+
+${ANCHORS}
+
+${PROPS_DOC}
+
+# Shot JSON
+ - id, set: copy from the storyboard shot. start: copy the anchor given. Omit duration (it runs to the next shot).
+ - camera: {position:[x,y,z], target:[x,y,z], fov (36-46), creep: 0.05}. Frame for 9:16 as described above.
+ - actors: [{id, bodyColor, position:[x,0,z], facingY, glasses}] copying id/bodyColor/glasses from the cast. Keep actors near z=0..1.5 in front of the set, x within the visible width.
+ - props and propEvents: see Number props above; omit both when the shot has no number.
+${EVENTS_DOC}
  - transitionIn: {"type":"cut"|"dissolve","frames":6} from the storyboard.
 
 # Output
 Return ONE JSON object matching this schema and nothing else:
+${schemaText(ShotSource)}`;
+
+export const EDIT_SYSTEM = `You are the Shot Editor of an automated studio. A person clicked on one thing in a rendered shot and told you what to change.
+You receive that shot's complete JSON, what was clicked, and their instruction. You return the complete updated JSON for THIS SHOT ONLY.
+
+${WORLD}
+
+${ANCHORS}
+
+${PROPS_DOC}
+
+${EVENTS_DOC}
+
+${SET_OBJECTS_DOC}
+
+# How to edit
+ - Change only what the instruction asks for and leave everything else exactly as it is: same ids, same camera unless it must move, same events.
+ - Keep "id" and "start" exactly as given. Keep "set" unless the instruction asks for another set and one of the listed set ids fits.
+ - Clicked an actor or a prop: edit that entry in "actors" / "props" (and its "events" / "propEvents").
+ - Clicked a set object (a sign, a machine, the window ...): the set is shared with other shots, so NEVER edit the set. Use "setOverrides" instead, which applies to this shot alone:
+     {"setOverrides": {"remove": ["id of an object to delete"], "objects": [<a complete object>, ...]}}
+   An object in "objects" whose id matches an object of the set REPLACES it (give the full object with the new position/colour/text); an object with a new id is ADDED.
+   To move a set object, replace it with the same id and a new position. Keep whatever setOverrides the shot already has unless the instruction undoes them.
+ - New ids are lowercase letters, digits and underscore, and must not clash with existing ones.
+ - Every time is a word anchor (see Timing), never seconds. Only use words from the list you are given, and only words inside this shot.
+ - The result must still frame well: heads in frame above the caption zone, props in frame, nothing walking through props, no walk too fast. You will be told if it does not.
+
+# Output
+Return ONE JSON object, the complete shot, and nothing else. It must match this schema:
 ${schemaText(ShotSource)}`;

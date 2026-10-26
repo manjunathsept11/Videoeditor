@@ -401,11 +401,15 @@ function buildMagnifier(def: Extract<PropDef, { kind: 'magnifier' }>): PropMesh 
 }
 
 export function buildProp(def: PropDef): PropMesh {
-  switch (def.kind) {
-    case 'counter': return buildCounter(def);
-    case 'dial': return buildDial(def);
-    case 'calendar': return buildCalendar(def);
-    case 'clock': return buildClock(def);
-    case 'magnifier': return buildMagnifier(def);
-  }
+  const mesh = (() => {
+    switch (def.kind) {
+      case 'counter': return buildCounter(def);
+      case 'dial': return buildDial(def);
+      case 'calendar': return buildCalendar(def);
+      case 'clock': return buildClock(def);
+      case 'magnifier': return buildMagnifier(def);
+    }
+  })();
+  mesh.group.userData.pick = { kind: 'prop', id: def.id };
+  return mesh;
 }

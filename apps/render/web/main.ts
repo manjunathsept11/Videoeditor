@@ -1,4 +1,4 @@
-import { Studio } from '@shortstudio/engine';
+import { Studio, type Pick, type PickResult } from '@shortstudio/engine';
 import { exportVideo } from '@shortstudio/export';
 import type { Bundle } from '@shortstudio/schema';
 
@@ -18,6 +18,11 @@ declare global {
       exportVideo(opts: { fps: number; bitrate?: number; codec?: string }): Promise<ExportSummary>;
       readChunk(offset: number, length: number): string;
       progress(): { done: number; total: number };
+      /** Click-to-edit: what is under NDC (x, y) at time t. */
+      pick(t: number, x: number, y: number): PickResult | null;
+      highlight(ref: (Pick & { shotId: string }) | null): void;
+      /** Hot reload: rebuild only the named shots from an updated bundle. */
+      updateBundle(bundle: Bundle, changed?: string[]): void;
     };
   }
 }
@@ -39,6 +44,7 @@ window.studioApi = {
   },
   async exportVideo({ fps, bitrate, codec }) {
     const s = studio!;
+    s.highlight(null); // the selection box is an editor aid and never belongs in an export
     const frames = Math.round(s.duration * fps);
     progress = { done: 0, total: frames };
     const r = await exportVideo({
@@ -56,5 +62,8 @@ window.studioApi = {
     return btoa(bin);
   },
   progress: () => progress,
+  pick: (t, x, y) => studio!.pick(t, x, y),
+  highlight: (ref) => studio!.highlight(ref),
+  updateBundle: (bundle, changed) => studio!.updateBundle(bundle, changed),
 };
 (window as unknown as { ready: boolean }).ready = true;

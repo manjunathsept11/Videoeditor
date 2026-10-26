@@ -39,6 +39,7 @@ export class Mannequin {
     this.group.scale.setScalar(actor.scale);
     this.group.add(this.pelvis);
     this.pelvis.position.y = HIP_IDLE;
+    this.group.userData.pick = { kind: 'actor', id: actor.id };
 
     const white = this.toon('#ffffff');
     const body = this.toon(actor.bodyColor);

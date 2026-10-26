@@ -70,6 +70,12 @@ function glowTexture(): THREE.CanvasTexture {
 }
 
 export function buildSetObject(o: SetObject): THREE.Object3D {
+  const obj = buildRaw(o);
+  obj.userData.pick = { kind: 'set', id: o.id };
+  return obj;
+}
+
+function buildRaw(o: SetObject): THREE.Object3D {
   switch (o.kind) {
     case 'floor': {
       const m = new THREE.Mesh(
@@ -112,6 +118,7 @@ export function buildSetObject(o: SetObject): THREE.Object3D {
           new THREE.MeshBasicMaterial({ map: glowTexture(), color: o.color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
         );
         halo.position.z = -0.02;
+        halo.raycast = () => {}; // glow is not clickable
         g.add(halo);
       }
       return g;

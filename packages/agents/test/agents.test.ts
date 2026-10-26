@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Alignment } from '@shortstudio/schema';
-import { CliProvider, GenerationError, SET_SYSTEM, SHOT_SYSTEM, designSet, extractJson, generateValidated, produceProject, type CompletionRequest, type LlmProvider } from '../src/index';
+import { Alignment, SetDef } from '@shortstudio/schema';
+import { CliProvider, GenerationError, SET_SYSTEM, SHOT_SYSTEM, describeTarget, designSet, editShot, extractJson, generateValidated, produceProject, type CompletionRequest, type LlmProvider } from '../src/index';
 
 // ---------------------------------------------------------------- json extraction
 describe('extractJson', () => {
@@ -234,5 +234,90 @@ describe('Set Designer and the set kit', () => {
     const set = await designSet(p, { id: 'street', brief: 'neon street' });
     expect(set.objects.filter((o) => ['pachinko', 'shopcounter', 'lantern', 'streetlight'].includes(o.kind))).toHaveLength(4);
     expect(p.calls).toHaveLength(1); // valid first time, no repair needed
+  });
+});
+
+describe('editShot (click-to-edit)', () => {
+  const sets = { street: SetDef.parse(setJson('street')), hall: SetDef.parse(setJson('hall')) }; // parsed, as a real bundle's sets are, so defaults are filled in
+  const base = (): import('@shortstudio/schema').ShotSource => ({
+    id: 'shot_01', set: 'street', start: 0, duration: undefined,
+    camera: { position: [0, 1.8, 10], target: [0, 1.6, 0], fov: 40, creep: 0.05 },
+    actors: [{ id: 'ken', bodyColor: '#ff7a1a', position: [-0.8, 0, 0], facingY: 0, glasses: false, scale: 1 }],
+    props: [{ kind: 'counter', id: 'yen', position: [0, 4, 0], rotationY: 0, scale: 0.8, digits: 2, prefix: '', suffix: '', initial: 0 }],
+    setOverrides: { remove: [], objects: [] },
+    transitionIn: { type: 'cut', frames: 6 },
+    events: [{ type: 'gesture', actor: 'ken', at: { word: 'gambling', nth: 1, edge: 'start', offset: 0 }, gesture: 'point', hand: 'right', hold: 0.8 }],
+    propEvents: [{ prop: 'yen', at: { word: 'gambling', nth: 1, edge: 'start', offset: 0 }, value: 34 }],
+  });
+  const input = (target: { kind: 'actor' | 'prop' | 'set'; id: string }, instruction: string) => ({
+    shot: base(), sets, alignment, start: 0, end: 1.7, target, instruction,
+  });
+
+  it('sends the clicked target, the instruction, the whole shot and the words in it', async () => {
+    const p = new Scripted(() => JSON.stringify(base()));
+    await editShot(p, input({ kind: 'prop', id: 'yen' }, 'make it a dollar counter'));
+    const user = p.calls[0]!.messages[0]!.content;
+    expect(user).toContain('clicked: prop "yen"');
+    expect(user).toContain('make it a dollar counter');
+    expect(user).toContain('"digits": 2'); // the whole current shot
+    expect(user).toContain('Japan bans gambling'); // only the words inside 0-1.7s
+    expect(user).not.toContain('legal');
+    expect(p.calls[0]!.system).toContain('NEVER edit the set'); // the rule that keeps edits to one file
+  });
+
+  it('applies an edit to a prop and keeps everything else', async () => {
+    const edited = { ...base(), props: [{ ...base().props[0]!, prefix: '$' }] };
+    const out = await editShot(new Scripted(() => JSON.stringify(edited)), input({ kind: 'prop', id: 'yen' }, 'dollars'));
+    expect((out.props[0] as { prefix: string }).prefix).toBe('$');
+    expect(out.actors).toEqual(base().actors);
+    expect(out.events).toEqual(base().events);
+  });
+
+  it('edits a set object through setOverrides, leaving the shared set alone', async () => {
+    const edited = { ...base(), setOverrides: { remove: ['b0'], objects: [{ kind: 'sign', id: 'sign', position: [2, 3.3, -3.9], size: [5, 1.2], text: 'CAT', color: '#ff3df0', background: '#0a0a14', rotationY: 0, glow: true }] } };
+    const out = await editShot(new Scripted(() => JSON.stringify(edited)), input({ kind: 'set', id: 'sign' }, 'move the sign right and say CAT'));
+    expect(out.setOverrides.remove).toEqual(['b0']);
+    expect((out.setOverrides.objects[0] as { text: string }).text).toBe('CAT');
+    expect(sets.street.objects.some((o) => o.id === 'sign')).toBe(true); // untouched
+  });
+
+  it('shows the model the clicked set object as it currently stands', () => {
+    const d = describeTarget(input({ kind: 'set', id: 'sign' }, 'x'));
+    expect(JSON.parse(d)).toMatchObject({ kind: 'sign', id: 'sign', text: 'パチンコ' });
+    expect(describeTarget(input({ kind: 'actor', id: 'ghost' }, 'x'))).toBe('null');
+  });
+
+  it('refuses to change the id, the start time or the set to something that does not exist, and repairs', async () => {
+    const bad = { ...base(), id: 'shot_99', start: { word: 'legal', nth: 1, edge: 'start', offset: 0 }, set: 'nowhere' };
+    const p = new Scripted((_, n) => JSON.stringify(n === 1 ? bad : base()));
+    const out = await editShot(p, input({ kind: 'actor', id: 'ken' }, 'nudge ken'));
+    expect(out.id).toBe('shot_01');
+    const repair = p.calls[1]!.messages.at(-1)!.content;
+    expect(repair).toMatch(/id must stay "shot_01"/);
+    expect(repair).toMatch(/start must stay exactly 0/);
+    expect(repair).toMatch(/set "nowhere" does not exist/);
+  });
+
+  it('can switch to another existing set when asked', async () => {
+    const out = await editShot(new Scripted(() => JSON.stringify({ ...base(), set: 'hall' })), input({ kind: 'actor', id: 'ken' }, 'put this in the hall'));
+    expect(out.set).toBe('hall');
+  });
+
+  it('sends back an edit that pushes ken out of frame, a bad override removal, and a prop event with no word', async () => {
+    const out1 = { ...base(), actors: [{ ...base().actors[0]!, position: [4, 0, 0] }], setOverrides: { remove: ['ghost'], objects: [] },
+      propEvents: [{ prop: 'yen', at: { word: 'pachinko', nth: 1, edge: 'start', offset: 0 }, value: 1 }] };
+    const p = new Scripted((_, n) => JSON.stringify(n === 1 ? out1 : base()));
+    await editShot(p, input({ kind: 'actor', id: 'ken' }, 'move ken to the right'));
+    const repair = p.calls[1]!.messages.at(-1)!.content;
+    expect(repair).toMatch(/eyes leave the frame/);
+    expect(repair).toMatch(/"ghost", which is not an object/);
+    expect(repair).toMatch(/"pachinko" not found/);
+  });
+
+  it('now catches a walk that leaves the frame inside the repair loop (events used to be stripped from the check)', async () => {
+    const walker = { ...base(), events: [{ type: 'walk', actor: 'ken', at: { word: 'Japan', nth: 1, edge: 'start', offset: 0 }, until: { word: 'gambling', nth: 1, edge: 'end', offset: 0 }, to: [7, 0], turn: true }] };
+    const p = new Scripted((_, n) => JSON.stringify(n === 1 ? walker : base()));
+    await editShot(p, input({ kind: 'actor', id: 'ken' }, 'walk off to the right'));
+    expect(p.calls[1]!.messages.at(-1)!.content).toMatch(/eyes leave the frame|cannot span the stride/);
   });
 });

@@ -9,6 +9,7 @@ Deterministic, code-driven 3D engine for 9:16 explainer shorts. Full design: [do
 | `packages/schema` | zod schemas for `project.json`, `sets/*.json`, `shots/*.json` + cross-reference validation (`parseBundle`) |
 | `packages/engine` | The six animation rules as pure functions (`rules.ts`), pose/timeline resolution (no WebGL, unit-tested), and the Three.js layer (`Studio`, WhiteLift + inverted-hull shaders, mannequin, procedural set kit) |
 | `packages/audio` | Silence clamping with a source-to-output time map, WhisperX importer, BS.1770 loudness meter, synthesized SFX, timeline-driven cues, the mixer (-14 LUFS master) |
+| `apps/desktop` | The desktop app: Electron shell, click-to-edit viewport, edit/diff/undo, export, installer config |
 | `packages/export` | WebCodecs + mp4-muxer video export (frame N is rendered at t = N / fps; H.264, falling back to VP9/AV1) |
 | `packages/qa` | Quality gate: framing/eye-line/caption-zone, blocked views, prop clipping, floor coverage; each with an auto-fix |
 | `packages/agents` | Director -> Set Designer -> Scene Builder, validated and self-repairing; Claude API and local-CLI backends behind one interface |
@@ -28,6 +29,35 @@ npm run typecheck
 npm run render -- examples/demo out/demo.mp4 --scale 0.5      # preview
 npm run render -- examples/demo out/f.png --frame 54 --scale 0.5   # single frame
 ```
+
+## The desktop app: click-to-edit
+
+```bash
+npm run desktop:build      # Vite builds the renderer, esbuild bundles the main process
+npm run desktop:start      # run it (Electron)
+npm run desktop:dist       # package it with electron-builder (the Windows installer is built by CI, see below)
+```
+
+Open a project folder, scrub or play the timeline, and **click anything in the picture**: a character, a prop, or a piece of the set. It gets
+a glowing selection box and a prompt box. Describe the change; the model rewrites **only that shot's JSON**, you see a **diff** and an instant
+preview of just that shot (nothing is saved yet), and then **Apply** or **Discard**. Apply overwrites exactly one file
+(`shots/shot_07.json`), snapshots the old one under `.shortstudio/history/`, and hot-reloads that one shot. **Undo/Redo** restore the file byte for byte.
+
+- **Editing a set object** (the window, a sign, a machine) never touches the shared set. The shot gets `setOverrides` (remove / replace by id / add),
+  so "move the window to the left wall, add a cat on the counter" changes `shot_07.json` and nothing else.
+- The edit agent is held to the same checks as a freshly built shot (schema, anchors inside the shot, the whole quality gate including walks), is told
+  what it may not change (the shot's id and start time, the shared set), and repairs its own mistakes before you ever see a diff.
+- **Model:** Settings (the gear) picks a local CLI (`claude -p`, `gemini -p`, ...) or the Claude API. The API key lives in the OS keystore (Electron
+  `safeStorage`: DPAPI on Windows), is never written as plain text and is never sent back to the page.
+- **Export** runs the same WebCodecs encoder at full size in the app, streams the video to the main process, and mixes the audio and muxes with a
+  **bundled ffmpeg** (`ffmpeg-static`), so the installed app needs nothing else.
+- **Security:** the page runs sandboxed with context isolation and no Node; the preload exposes three functions; the service methods the page can call
+  are an allow-list; the packaged page has a strict Content-Security-Policy.
+
+The same renderer also runs in a plain browser against an HTTP transport (`apps/desktop/src/server.ts`); that is what most of the UI tests drive.
+
+**Installer:** `.github/workflows/desktop.yml` typechecks and tests on Linux (including a real Electron run under xvfb), then on `windows-latest`
+builds `ShortStudio-Setup.exe` (NSIS) and uploads it as an artifact, attaching it to a release when one is published.
 
 ## Making a short from a script
 

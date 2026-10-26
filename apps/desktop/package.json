@@ -1,0 +1,13 @@
+{
+  "name": "@shortstudio/desktop",
+  "productName": "ShortStudio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "description": "ShortStudio: AI explainer-short studio with click-to-edit",
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
+  },
+  "author": "ShortStudio"
+}

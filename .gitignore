@@ -2,3 +2,7 @@ node_modules/
 out/
 dist/
 *.log
+apps/desktop/dist-electron/
+apps/desktop/dist-renderer/
+release/
+.shortstudio/

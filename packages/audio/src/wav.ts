@@ -4,7 +4,7 @@ export const SAMPLE_RATE = 48000;
 
 /** Decode any audio file ffmpeg understands to mono float samples at 48kHz. */
 export function decodeAudio(path: string, sampleRate = SAMPLE_RATE): Float32Array {
-  const r = spawnSync('ffmpeg', ['-v', 'error', '-i', path, '-ac', '1', '-ar', String(sampleRate), '-f', 'f32le', '-'], {
+  const r = spawnSync(process.env.FFMPEG_PATH ?? 'ffmpeg', ['-v', 'error', '-i', path, '-ac', '1', '-ar', String(sampleRate), '-f', 'f32le', '-'], {
     maxBuffer: 1 << 30,
   });
   if (r.status !== 0) throw new Error(`ffmpeg failed to decode ${path}: ${r.stderr?.toString() ?? r.error}`);
