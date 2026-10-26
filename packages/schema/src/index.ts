@@ -55,6 +55,71 @@ export const SetObject = z.discriminatedUnion('kind', [
     intensity: z.number().default(20),
     distance: z.number().default(12),
   }),
+  // ---- set dressing. `position` is the centre of the base on the floor unless noted.
+  z.object({
+    kind: z.literal('pachinko'),
+    id: Id,
+    position: Vec3,
+    rotationY: z.number().default(0),
+    scale: z.number().default(1),
+    /** Accent colour of the lights and header. */
+    color: Color.default('#5a3cff'),
+    /** Header text. */
+    text: z.string().default('777'),
+  }),
+  z.object({
+    kind: z.literal('shopcounter'),
+    id: Id,
+    position: Vec3,
+    rotationY: z.number().default(0),
+    width: z.number().default(3),
+    color: Color.default('#8a5a2b'),
+  }),
+  z.object({
+    kind: z.literal('exchangewindow'),
+    id: Id,
+    /** Centre of the opening. */
+    position: Vec3,
+    rotationY: z.number().default(0),
+    /** Opening width and height. */
+    size: Vec2.default([2.4, 1.5]),
+    color: Color.default('#2a2238'),
+    glow: Color.default('#ffcc66'),
+  }),
+  z.object({
+    kind: z.literal('shelf'),
+    id: Id,
+    position: Vec3,
+    rotationY: z.number().default(0),
+    size: Vec2.default([2.2, 2.2]),
+    color: Color.default('#6b4a2a'),
+  }),
+  z.object({
+    kind: z.literal('lantern'),
+    id: Id,
+    /** Centre of the lantern (hang it by raising y). */
+    position: Vec3,
+    scale: z.number().default(1),
+    color: Color.default('#e63946'),
+    text: z.string().default(''),
+  }),
+  z.object({
+    kind: z.literal('vending'),
+    id: Id,
+    position: Vec3,
+    rotationY: z.number().default(0),
+    scale: z.number().default(1),
+    color: Color.default('#e63946'),
+  }),
+  z.object({
+    kind: z.literal('streetlight'),
+    id: Id,
+    position: Vec3,
+    scale: z.number().default(1),
+    color: Color.default('#ffd27a'),
+    /** Also cast real light (costs a point light). */
+    light: z.boolean().default(false),
+  }),
 ]);
 
 export const SetDef = z.object({
@@ -259,6 +324,24 @@ export const Project = z.object({
   fps: z.union([z.literal(30), z.literal(60)]).default(30),
   sets: z.array(Id),
   shots: z.array(Id),
+  /**
+   * Post-processing look. Both default on, mildly; set either to false to switch it off. Bloom only picks up
+   * pixels brighter than `threshold` (1.0 is plain white), i.e. emissive things like neon, lanterns and lamps.
+   */
+  look: z
+    .object({
+      bloom: z
+        .union([
+          z.object({ strength: z.number().default(0.4), radius: z.number().default(0.5), threshold: z.number().default(1.1) }),
+          z.literal(false),
+        ])
+        .default({ strength: 0.4, radius: 0.5, threshold: 1.1 }),
+      /** Focus follows the actors; everything nearer or farther softens. */
+      dof: z
+        .union([z.object({ aperture: z.number().default(0.0008), maxBlur: z.number().default(0.012) }), z.literal(false)])
+        .default({ aperture: 0.0008, maxBlur: 0.012 }),
+    })
+    .default({ bloom: { strength: 0.4, radius: 0.5, threshold: 1.1 }, dof: { aperture: 0.0008, maxBlur: 0.012 } }),
   /** Word-timed captions in the lower 30%; only drawn when the project has an alignment. */
   captions: z
     .object({

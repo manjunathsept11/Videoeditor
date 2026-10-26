@@ -13,6 +13,7 @@ Deterministic, code-driven 3D engine for 9:16 explainer shorts. Full design: [do
 | `packages/agents` | Director -> Set Designer -> Scene Builder, validated and self-repairing; Claude API and local-CLI backends behind one interface |
 | `apps/render` | Headless renderer (Vite + Playwright -> PNG frames -> ffmpeg -> MP4, muxes the voiceover) and the `audio` CLI |
 | `examples/demo` | 4-shot sample project with hand-typed times |
+| `examples/kit` | The set kit: pachinko hall, prize shop, exchange-window alley |
 | `examples/rig` | A walk across the set (foot-locked, with the bob and arm swing), a gesture, and a jolt |
 | `examples/props` | The five number props (counter, dial, calendar, clock, magnifier), each landing on a spoken word |
 | `examples/anchored` | Same shots authored against words (`"at": {"word": "gambling"}`) + a sample `audio/alignment.json` |
@@ -42,6 +43,19 @@ answer. Floor gaps are repaired deterministically at set level. `--provider cli`
 (`--cli gemini --cli-args "-p"`). `render` runs the gate first and refuses to render a broken project unless you pass `--force`.
 Captions come from the alignment (lower 30%, white with black stroke, 3 words per line) and can be switched off or given a
 highlight colour for the spoken word in `project.json` (`"captions": {"enabled": true, "highlight": "#ffe14a"}`).
+
+## Sets and look
+
+Set objects beyond boxes, signs and lights (all procedural, detail seeded from the object id so renders repeat exactly):
+`pachinko` (lit pin panel, header, ball tray, side light bars), `shopcounter`, `exchangewindow`, `shelf` (stocked with prizes), `lantern`,
+`vending`, `streetlight`. Each has collision bounds in the quality gate (blocked views, prop clipping).
+
+`project.json` -> `look` controls post-processing. Both are on by default, mildly:
+
+- **Depth of field:** focus follows the actors (distance to their centroid), so backgrounds and foreground soften while the characters
+  stay sharp. `"dof": {"aperture": 0.0008, "maxBlur": 0.012}` or `false`.
+- **Bloom:** only pixels brighter than `threshold` (1.0 is plain white) glow, so it picks out neon, lanterns and lamps, never white heads.
+  `"bloom": {"strength": 0.4, "radius": 0.5, "threshold": 1.1}` or `false`.
 
 ## Body motion: walk and jolt
 

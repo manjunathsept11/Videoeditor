@@ -1,0 +1,152 @@
+{
+  "id": "prize_shop",
+  "lighting": "cinema",
+  "background": "#1a1020",
+  "fog": {
+    "color": "#1a1020",
+    "near": 14,
+    "far": 40
+  },
+  "objects": [
+    {
+      "kind": "floor",
+      "id": "tiles",
+      "size": [
+        40,
+        40
+      ],
+      "color": "#3a2a44",
+      "position": [
+        0,
+        0,
+        -6
+      ]
+    },
+    {
+      "kind": "box",
+      "id": "back_wall",
+      "position": [
+        0,
+        4,
+        -9
+      ],
+      "size": [
+        30,
+        8,
+        0.4
+      ],
+      "color": "#d9c9a8"
+    },
+    {
+      "kind": "shelf",
+      "id": "shelf_l",
+      "position": [
+        -3.4,
+        0,
+        -8.5
+      ],
+      "size": [
+        2.4,
+        3.2
+      ]
+    },
+    {
+      "kind": "shelf",
+      "id": "shelf_r",
+      "position": [
+        3.4,
+        0,
+        -8.5
+      ],
+      "size": [
+        2.4,
+        3.2
+      ]
+    },
+    {
+      "kind": "shelf",
+      "id": "shelf_c",
+      "position": [
+        0,
+        0,
+        -8.6
+      ],
+      "size": [
+        2.4,
+        3.2
+      ]
+    },
+    {
+      "kind": "shopcounter",
+      "id": "counter",
+      "position": [
+        0,
+        0,
+        -5
+      ],
+      "width": 6
+    },
+    {
+      "kind": "sign",
+      "id": "sign_prize",
+      "position": [
+        0,
+        6.2,
+        -8.7
+      ],
+      "size": [
+        5.5,
+        1.3
+      ],
+      "text": "景品 PRIZES",
+      "color": "#ff3d8a",
+      "background": "#12061c"
+    },
+    {
+      "kind": "lantern",
+      "id": "ln_a",
+      "position": [
+        -4.5,
+        5.2,
+        -6
+      ],
+      "color": "#e63946",
+      "text": "福"
+    },
+    {
+      "kind": "lantern",
+      "id": "ln_b",
+      "position": [
+        4.5,
+        5.2,
+        -6
+      ],
+      "color": "#e63946",
+      "text": "福"
+    },
+    {
+      "kind": "light",
+      "id": "key",
+      "position": [
+        0,
+        6,
+        -3
+      ],
+      "color": "#ffcf8a",
+      "intensity": 40,
+      "distance": 18
+    },
+    {
+      "kind": "light",
+      "id": "pinkwash",
+      "position": [
+        0,
+        3,
+        -6
+      ],
+      "color": "#ff3d8a",
+      "intensity": 25,
+      "distance": 12
+    }
+  ]
+}

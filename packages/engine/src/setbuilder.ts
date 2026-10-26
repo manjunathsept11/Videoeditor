@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { SetObject } from '@shortstudio/schema';
+import { buildExchangeWindow, buildLantern, buildPachinko, buildShelf, buildShopCounter, buildStreetlight, buildVending } from './setKit';
 
 /** Small deterministic PRNG so lit-window patterns never change between renders. */
 function rng(seed: string): () => number {
@@ -120,5 +121,12 @@ export function buildSetObject(o: SetObject): THREE.Object3D {
       l.position.set(...o.position);
       return l;
     }
+    case 'pachinko': return buildPachinko(o);
+    case 'shopcounter': return buildShopCounter(o);
+    case 'exchangewindow': return buildExchangeWindow(o);
+    case 'shelf': return buildShelf(o);
+    case 'lantern': return buildLantern(o);
+    case 'vending': return buildVending(o);
+    case 'streetlight': return buildStreetlight(o);
   }
 }

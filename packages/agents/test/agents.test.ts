@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Alignment } from '@shortstudio/schema';
-import { CliProvider, GenerationError, SHOT_SYSTEM, extractJson, generateValidated, produceProject, type CompletionRequest, type LlmProvider } from '../src/index';
+import { CliProvider, GenerationError, SET_SYSTEM, SHOT_SYSTEM, designSet, extractJson, generateValidated, produceProject, type CompletionRequest, type LlmProvider } from '../src/index';
 
 // ---------------------------------------------------------------- json extraction
 describe('extractJson', () => {
@@ -209,5 +209,30 @@ describe('Scene Builder and props', () => {
   it('documents props in the Scene Builder prompt', () => {
     expect(SHOT_SYSTEM).toMatch(/counter/);
     expect(SHOT_SYSTEM).toMatch(/propEvents/);
+  });
+});
+
+describe('Set Designer and the set kit', () => {
+  it('documents every piece of set dressing the engine can build', () => {
+    for (const kind of ['pachinko', 'shopcounter', 'exchangewindow', 'shelf', 'lantern', 'vending', 'streetlight']) {
+      expect(SET_SYSTEM, kind).toContain(`kind:"${kind}"`);
+    }
+    expect(SET_SYSTEM).toMatch(/bloom/i);
+  });
+  it('accepts a set built from the kit', async () => {
+    const dressed = {
+      ...setJson('street'),
+      objects: [
+        ...setJson('street').objects,
+        { kind: 'pachinko', id: 'pm_1', position: [-3, 0, -5], color: '#ff3d8a', text: '大当' },
+        { kind: 'shopcounter', id: 'counter', position: [0, 0, -7], width: 5 },
+        { kind: 'lantern', id: 'ln', position: [0, 5, -4], text: '祭' },
+        { kind: 'streetlight', id: 'lamp', position: [4, 0, -3], light: true },
+      ],
+    };
+    const p = new Scripted(() => JSON.stringify(dressed));
+    const set = await designSet(p, { id: 'street', brief: 'neon street' });
+    expect(set.objects.filter((o) => ['pachinko', 'shopcounter', 'lantern', 'streetlight'].includes(o.kind))).toHaveLength(4);
+    expect(p.calls).toHaveLength(1); // valid first time, no repair needed
   });
 });

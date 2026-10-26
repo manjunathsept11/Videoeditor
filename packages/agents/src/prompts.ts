@@ -59,7 +59,16 @@ ${WORLD}
  - floor: {kind:"floor", id, size:[w,d], color, position?}. It MUST reach from behind the camera to the back wall: the bottom of the frame must never show empty void. Use size [40,40] with position [0,0,-6] (covers z=+14 to -26), and never a floor that stops short of the camera.
  - box: {kind:"box", id, position:[x,y,z], size:[w,h,d], color, emissive?, emissiveIntensity?, windows?}. position is the box CENTRE, so y = height/2 sits it on the floor. windows:true draws a lit-window grid on its +z face: use for buildings.
  - sign: {kind:"sign", id, position, size:[w,h], text, color, background?, rotationY?, glow?}. Neon text sign facing +z; Japanese text is supported.
- - light: {kind:"light", id, position, color, intensity (20-90 typical), distance (9-18)}. Point lights give the pools of coloured light; use 2-4.
+ - light: {kind:"light", id, position, color, intensity (20-60 typical), distance (9-18)}. Point lights give the pools of coloured light; use 2-4. Keep them modest: a very bright light near a wall washes it out (bloom makes anything brighter than white glow).
+ Set dressing (prefer these over plain boxes; they are detailed and already look right). position is the base centre on the floor unless noted:
+ - pachinko: {kind:"pachinko", id, position:[x,0,z], rotationY?, scale?, color (accent light colour), text? (header, e.g. "777", "大当")}. A lit pachinko machine about 1.1 wide and 2.35 tall. Line them up in rows 1.3-1.5 apart, vary colour and text, 2-3 rows deep.
+ - shopcounter: {kind:"shopcounter", id, position:[x,0,z], width?, color?}. A wooden prize counter with a cash register; about 1.1 tall and 0.9 deep.
+ - exchangewindow: {kind:"exchangewindow", id, position:[x,y,z] (CENTRE of the opening, y about 2), size?:[w,h], glow?}. A wall frame around a glowing glass window with a tray. Put a wall box behind it.
+ - shelf: {kind:"shelf", id, position:[x,0,z], size?:[w,h], color?}. A shelf unit stacked with colourful prizes.
+ - lantern: {kind:"lantern", id, position:[x,y,z] (centre; hang it high, y 4-6), scale?, color?, text? (one kanji)}. Glowing paper lantern.
+ - vending: {kind:"vending", id, position:[x,0,z], rotationY?, scale?, color?}. Lit drinks vending machine, 0.9 wide and 1.8 tall.
+ - streetlight: {kind:"streetlight", id, position:[x,0,z], scale?, light? (true adds a real point light)}. 4.2 tall lamp post with a glowing head.
+ Keep props out of the actors' spot (x within +-2, z from -1 to +3 is where the actors stand) and never inside each other.
 Set fields: id, lighting ("cinema" = warm key/cool fill/cyan rim, or "clean"), background (sky colour), fog {color, near, far} matching the background.
 
 Build depth: foreground clear for actors (z from -1 to +3), midground props and buildings at z -3 to -12, a back wall near z=-14..-20.

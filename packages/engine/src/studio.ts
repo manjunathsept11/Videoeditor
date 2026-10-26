@@ -10,6 +10,7 @@ import { cameraCreepScale } from './rules';
 import { CaptionOverlay } from './captionOverlay';
 import { buildCaptionLines, captionAt, type CaptionLine } from './captions';
 import { repairSceneNormals } from './normals';
+import { PostChain } from './post';
 import { buildSetObject } from './setbuilder';
 import { updateWhiteLift } from './shaders';
 
@@ -21,7 +22,11 @@ class ShotScene {
   private props: { def: Shot['props'][number]; mesh: PropMesh }[] = [];
   private toon: THREE.ShaderMaterial[] = [];
 
-  constructor(private shot: Shot, bundle: Bundle, aspect: number) {
+  readonly post: PostChain | undefined;
+  private focus = 10;
+
+  constructor(private shot: Shot, bundle: Bundle, renderer: THREE.WebGLRenderer, width: number, height: number) {
+    const aspect = width / height;
     const set = bundle.sets[shot.set]!;
     this.scene.background = new THREE.Color(set.background);
     if (set.fog) this.scene.fog = new THREE.Fog(set.fog.color, set.fog.near, set.fog.far);
@@ -41,6 +46,13 @@ class ShotScene {
     }
     repairSceneNormals(this.scene);
     this.camera = new THREE.PerspectiveCamera(shot.camera.fov, aspect, 0.1, 200);
+    const look = bundle.project.look;
+    if (look.bloom || look.dof) this.post = new PostChain(renderer, this.scene, this.camera, width, height, look);
+  }
+
+  /** Distance from the camera to the actors (the point to keep sharp). */
+  get focusDistance(): number {
+    return this.focus;
   }
 
   /** Pose everything for `localT` seconds into the shot. Pure function of (shot, t). */
@@ -54,7 +66,16 @@ class ShotScene {
     );
     this.camera.lookAt(...target);
     this.camera.updateMatrixWorld(true);
-    for (const m of this.actors) m.applyPose(actorPoseAt(this.shot, m.actor.id, this.shot.start + localT));
+    let cx = 0, cz = 0;
+    for (const m of this.actors) {
+      const pose = actorPoseAt(this.shot, m.actor.id, this.shot.start + localT);
+      m.applyPose(pose);
+      cx += pose.rig.root[0];
+      cz += pose.rig.root[2];
+    }
+    const n = this.actors.length || 1;
+    const aim = this.actors.length ? new THREE.Vector3(cx / n, 1.2, cz / n) : new THREE.Vector3(...this.shot.camera.target); // 1.2 ~ torso height
+    this.focus = this.camera.position.distanceTo(aim);
     for (const { def, mesh } of this.props) mesh.apply(propStateAt(this.shot, def, this.shot.start + localT));
     for (const mat of this.toon) updateWhiteLift(mat, this.rig, this.camera);
   }
@@ -115,35 +136,37 @@ export class Studio {
   private sceneFor(id: string): ShotScene {
     let s = this.scenes.get(id);
     if (!s) {
-      s = new ShotScene(this.bundle!.shots[id]!, this.bundle!, this.width / this.height);
+      s = new ShotScene(this.bundle!.shots[id]!, this.bundle!, this.renderer, this.width, this.height);
       this.scenes.set(id, s);
     }
     return s;
+  }
+
+  /** Render one shot to a linear texture: through its post chain, or straight into a target. */
+  private layer(shot: ShotScene, localT: number, target: THREE.WebGLRenderTarget): THREE.Texture {
+    shot.apply(localT);
+    if (shot.post) return shot.post.render(shot.focusDistance);
+    const r = this.renderer;
+    r.setRenderTarget(target);
+    r.render(shot.scene, shot.camera);
+    r.setRenderTarget(null);
+    return target.texture;
   }
 
   /** Render the project at timeline time `t` (seconds). */
   renderAt(t: number): void {
     const layers = resolveAt(this.bundle!, t);
     const r = this.renderer;
-    if (layers.length === 1) {
-      const s = this.sceneFor(layers[0]!.shotId);
-      s.apply(layers[0]!.localT);
-      r.setRenderTarget(null);
-      r.render(s.scene, s.camera);
-      this.captions?.render(r, captionAt(this.captionLines, t));
-      return;
-    }
-    const [a, b] = layers as [(typeof layers)[number], (typeof layers)[number]];
-    const sa = this.sceneFor(a.shotId);
-    const sb = this.sceneFor(b.shotId);
-    sa.apply(a.localT);
-    sb.apply(b.localT);
-    r.setRenderTarget(this.rtA); r.render(sa.scene, sa.camera);
-    r.setRenderTarget(this.rtB); r.render(sb.scene, sb.camera);
+    const first = layers[0]!;
+    const a = this.layer(this.sceneFor(first.shotId), first.localT, this.rtA);
+    const second = layers[1];
+    const b = second ? this.layer(this.sceneFor(second.shotId), second.localT, this.rtB) : a;
+    // post-chain textures live in the composers' buffers, which the next layer's chain does not touch,
+    // so both are still valid here; convert to display colour once, after any dissolve
     r.setRenderTarget(null);
-    this.quadMat.uniforms.uA!.value = this.rtA.texture;
-    this.quadMat.uniforms.uB!.value = this.rtB.texture;
-    this.quadMat.uniforms.uMix!.value = b.alpha;
+    this.quadMat.uniforms.uA!.value = a;
+    this.quadMat.uniforms.uB!.value = b;
+    this.quadMat.uniforms.uMix!.value = second ? second.alpha : 0;
     r.render(this.quadScene, this.quadCam);
     this.captions?.render(r, captionAt(this.captionLines, t));
   }

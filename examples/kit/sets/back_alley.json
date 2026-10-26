@@ -1,0 +1,192 @@
+{
+  "id": "back_alley",
+  "lighting": "cinema",
+  "background": "#0b1030",
+  "fog": {
+    "color": "#0b1030",
+    "near": 12,
+    "far": 36
+  },
+  "objects": [
+    {
+      "kind": "floor",
+      "id": "asphalt",
+      "size": [
+        40,
+        40
+      ],
+      "color": "#14162b",
+      "position": [
+        0,
+        0,
+        -6
+      ]
+    },
+    {
+      "kind": "box",
+      "id": "bld_l",
+      "position": [
+        -8,
+        6,
+        -9
+      ],
+      "size": [
+        7,
+        12,
+        6
+      ],
+      "color": "#1b2150",
+      "windows": true
+    },
+    {
+      "kind": "box",
+      "id": "bld_r",
+      "position": [
+        8,
+        6,
+        -9
+      ],
+      "size": [
+        7,
+        12,
+        6
+      ],
+      "color": "#241a4d",
+      "windows": true
+    },
+    {
+      "kind": "box",
+      "id": "back",
+      "position": [
+        0,
+        7,
+        -13
+      ],
+      "size": [
+        24,
+        14,
+        1
+      ],
+      "color": "#171a3c",
+      "windows": true
+    },
+    {
+      "kind": "box",
+      "id": "wall",
+      "position": [
+        0,
+        2.6,
+        -6.2
+      ],
+      "size": [
+        9,
+        5.2,
+        0.6
+      ],
+      "color": "#2a2238"
+    },
+    {
+      "kind": "exchangewindow",
+      "id": "window",
+      "position": [
+        0,
+        2.1,
+        -5.8
+      ],
+      "size": [
+        2.4,
+        1.4
+      ]
+    },
+    {
+      "kind": "sign",
+      "id": "sign_kanji",
+      "position": [
+        0,
+        4.6,
+        -5.45
+      ],
+      "size": [
+        4.4,
+        0.9
+      ],
+      "text": "景品交換所",
+      "color": "#38f0ff",
+      "background": "#04141a"
+    },
+    {
+      "kind": "vending",
+      "id": "vend_a",
+      "position": [
+        3.6,
+        0,
+        -5.2
+      ],
+      "color": "#e63946"
+    },
+    {
+      "kind": "vending",
+      "id": "vend_b",
+      "position": [
+        -3.6,
+        0,
+        -5.2
+      ],
+      "color": "#2d9cdb"
+    },
+    {
+      "kind": "streetlight",
+      "id": "lamp_l",
+      "position": [
+        -5.2,
+        0,
+        -4
+      ],
+      "light": true
+    },
+    {
+      "kind": "streetlight",
+      "id": "lamp_r",
+      "position": [
+        5.8,
+        0,
+        -3.2
+      ],
+      "light": true
+    },
+    {
+      "kind": "lantern",
+      "id": "ln_1",
+      "position": [
+        -2.2,
+        4.2,
+        -5.4
+      ],
+      "color": "#e63946",
+      "text": "酒"
+    },
+    {
+      "kind": "lantern",
+      "id": "ln_2",
+      "position": [
+        2.2,
+        4.2,
+        -5.4
+      ],
+      "color": "#e63946",
+      "text": "酒"
+    },
+    {
+      "kind": "light",
+      "id": "pink",
+      "position": [
+        0,
+        3,
+        -3
+      ],
+      "color": "#ff3df0",
+      "intensity": 45,
+      "distance": 12
+    }
+  ]
+}

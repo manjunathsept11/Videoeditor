@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseBundle } from '@shortstudio/schema';
 import { checkShot, fixShot } from '../src/fix';
 import { runQualityGate } from '../src/gate';
-import { segmentEntersBox } from '../src/solids';
+import { segmentEntersBox, solidsOf } from '../src/solids';
 
 const set = (objects: object[]) => ({ id: 's', background: '#000000', objects });
 const wall = { kind: 'box', id: 'pillar', position: [0, 2, 5], size: [2, 4, 1], color: '#444444' };
@@ -233,5 +233,69 @@ describe('moving actors', () => {
     const jolted = mk([{ type: 'jolt', actor: 'a', at: 0.1 }]);
     expect(checkShot(still.shots.a!, still.sets.s!).filter((i) => i.severity === 'error')).toEqual([]);
     expect(checkShot(jolted.shots.a!, jolted.sets.s!).some((i) => i.check === 'head-cropped')).toBe(true);
+  });
+});
+
+describe('set dressing: collision bounds and gate checks', () => {
+  const kit = (objects: object[], actors: object[] = [actor('a', [0, 0, 0])]) =>
+    parseBundle({
+      project: { name: 't', sets: ['s'], shots: ['a'] },
+      sets: [set([ground, ...objects])],
+      shots: [{ id: 'a', set: 's', start: 0, duration: 2, camera: cam, actors }],
+    });
+  const solid = (o: object) => {
+    const b = kit([o]);
+    return solidsOf(b.sets.s!).find((x) => x.id === (o as { id: string }).id)!;
+  };
+
+  it('every kind has bounds where the mesh really is', () => {
+    const p = solid({ kind: 'pachinko', id: 'p', position: [2, 0, -3] });
+    expect(p.min[1]).toBeCloseTo(0, 9);
+    expect(p.max[1]).toBeCloseTo(2.35, 9);
+    expect((p.min[0] + p.max[0]) / 2).toBeCloseTo(2, 9);
+    expect(solid({ kind: 'pachinko', id: 'p', position: [0, 0, 0], scale: 2 }).max[1]).toBeCloseTo(4.7, 9);
+    expect(solid({ kind: 'shopcounter', id: 'c', position: [0, 0, 0], width: 6 }).max[0]).toBeCloseTo(3.1, 9);
+    expect(solid({ kind: 'shelf', id: 'sh', position: [0, 0, 0], size: [2, 3] }).max[1]).toBeCloseTo(3, 9);
+    expect(solid({ kind: 'vending', id: 'v', position: [0, 0, 0] }).max[1]).toBeCloseTo(1.8, 9);
+    expect(solid({ kind: 'streetlight', id: 'l', position: [0, 0, 0] }).max[1]).toBeCloseTo(4.4, 9);
+    expect(solid({ kind: 'lantern', id: 'ln', position: [0, 5, 0] }).min[1]).toBeCloseTo(4.55, 9);
+    const w = solid({ kind: 'exchangewindow', id: 'w', position: [0, 2, 0], size: [2.4, 1.5] });
+    expect(w.max[1] - w.min[1]).toBeCloseTo(2.3, 9);
+  });
+  it('rotation widens the footprint', () => {
+    const flat = solid({ kind: 'shopcounter', id: 'c', position: [0, 0, 0], width: 4 });
+    const turned = solid({ kind: 'shopcounter', id: 'c', position: [0, 0, 0], width: 4, rotationY: Math.PI / 2 });
+    expect(flat.max[0]).toBeGreaterThan(turned.max[0]);
+    expect(turned.max[2]).toBeGreaterThan(flat.max[2]);
+  });
+  it('an actor inside a pachinko machine is flagged, and one beside it is not', () => {
+    const p = { kind: 'pachinko', id: 'p', position: [0, 0, 0] };
+    expect(checkShot(kit([p]).shots.a!, kit([p]).sets.s!).map((i) => i.check)).toContain('prop-clipping');
+    const beside = kit([{ ...p, position: [3, 0, 0] }]);
+    expect(checkShot(beside.shots.a!, beside.sets.s!).map((i) => i.check)).not.toContain('prop-clipping');
+  });
+  it('a machine between the camera and an actor blocks the view', () => {
+    const b = kit([{ kind: 'pachinko', id: 'p', position: [0, 0, 4] }]);
+    expect(checkShot(b.shots.a!, b.sets.s!).map((i) => i.check)).toContain('object-occlusion');
+  });
+  it('a streetlight (a thin pole) does not clip an actor standing a step away', () => {
+    const b = kit([{ kind: 'streetlight', id: 'l', position: [0.8, 0, 0] }]);
+    expect(checkShot(b.shots.a!, b.sets.s!).map((i) => i.check)).not.toContain('prop-clipping');
+  });
+});
+
+describe('look defaults', () => {
+  it('bloom and depth of field are on by default, bloom above plain white', () => {
+    const b = bundle([ground], cam, [actor('a', [0, 0, 0])]);
+    expect(b.project.look.bloom).toMatchObject({ threshold: 1.1 });
+    expect(b.project.look.dof).toMatchObject({ aperture: 0.0008 });
+  });
+  it('either can be switched off', () => {
+    const b = parseBundle({
+      project: { name: 't', sets: ['s'], shots: ['a'], look: { bloom: false, dof: false } },
+      sets: [set([ground])],
+      shots: [{ id: 'a', set: 's', start: 0, duration: 2, camera: cam }],
+    });
+    expect(b.project.look).toEqual({ bloom: false, dof: false });
   });
 });
