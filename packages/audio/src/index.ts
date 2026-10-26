@@ -5,3 +5,6 @@ export * from './loudness';
 export * from './synth';
 export * from './sfx';
 export * from './mix';
+export * from './tts';
+export * from './scriptAlign';
+export * from './transcribe';

@@ -8,7 +8,7 @@ Deterministic, code-driven 3D engine for 9:16 explainer shorts. Full design: [do
 |:--|:--|
 | `packages/schema` | zod schemas for `project.json`, `sets/*.json`, `shots/*.json` + cross-reference validation (`parseBundle`) |
 | `packages/engine` | The six animation rules as pure functions (`rules.ts`), pose/timeline resolution (no WebGL, unit-tested), and the Three.js layer (`Studio`, WhiteLift + inverted-hull shaders, mannequin, procedural set kit) |
-| `packages/audio` | Silence clamping with a source-to-output time map, WhisperX importer, BS.1770 loudness meter, synthesized SFX, timeline-driven cues, the mixer (-14 LUFS master) |
+| `packages/audio` | Silence clamping with a source-to-output time map, text-to-speech with word timings, WhisperX runner/importer and script alignment, BS.1770 loudness meter, synthesized SFX, timeline-driven cues, the mixer (-14 LUFS master) |
 | `apps/desktop` | The desktop app: Electron shell, click-to-edit viewport, edit/diff/undo, export, installer config |
 | `packages/export` | WebCodecs + mp4-muxer video export (frame N is rendered at t = N / fps; H.264, falling back to VP9/AV1) |
 | `packages/qa` | Quality gate: framing/eye-line/caption-zone, blocked views, prop clipping, floor coverage; each with an auto-fix |
@@ -157,21 +157,59 @@ The quality gate checks props are fully in frame (including the camera creep) an
 
 ## Voiceover workflow
 
+Two ways to get a voiceover and its word times. Everything after this step (shots, render, mix) is the same.
+
+### A. No recording: the script speaks
+
+```bash
+npm run audio -- speak script.txt projects/x            # writes audio/voiceover_tight.wav + audio/alignment.json
+npm run produce -- script.txt projects/x --speak --provider cli    # speak, then direct/build the whole project
+```
+
+The engine made the audio, so it knows when each word was said: no recognizer is involved. Engines: `espeak-ng`
+(offline; needs installing on Linux), Windows' built-in SAPI voices through PowerShell, macOS `say`; `--engine auto`
+picks the OS's own. Any other CLI that turns text into a WAV can sit behind `CommandTts`.
+
+`--timing` chooses how word boundaries are found:
+
+| mode | how | accuracy |
+|---|---|---|
+| `words` (default) | every word synthesized on its own | boundaries exact by construction; delivery is choppier |
+| `prefix` | one synthesis per sentence, each word's end estimated from the length of its prefix, snapped to the nearest dip in the sound | smoother delivery; boundaries approximate, because engines stretch the last word of any utterance |
+| `proportional` | one synthesis per sentence, boundaries shared out by word length | cheapest and roughest |
+
+The result already obeys the 0.2 s pause limit (a silence clamp runs at the end and the word times move with it).
+
+### B. A recording
+
 ```bash
 # 1. Tighten: clamp every pause to <= 0.2s (writes out.wav + out.wav.map.json)
 npm run audio -- tighten voiceover.wav projects/x/audio/voiceover_tight.wav
 
-# 2. Word timestamps: run WhisperX (or whisper-timestamped) yourself, then import.
-#    Needs a machine that can download the model.
+# 2. Word timestamps. Needs a machine with WhisperX installed (pip install whisperx; it downloads its models on first use).
+npm run audio -- transcribe projects/x/audio/voiceover_tight.wav projects/x/audio/alignment.json \
+    --script script.txt --model small --language en
+#    --script snaps the recognized words to your script's spelling, fills in words the recognizer missed, drops ones it invented.
+#    Prefer to run WhisperX yourself?
 whisperx projects/x/audio/voiceover_tight.wav --output_format json --output_dir tmp
 npm run audio -- import-whisper tmp/voiceover_tight.json projects/x/audio/alignment.json \
     --audio projects/x/audio/voiceover_tight.wav
 #    If you aligned the ORIGINAL (untightened) audio instead, add: --map projects/x/audio/voiceover_tight.wav.map.json
+```
 
-# 3. Author shots against words, check the resolved timeline, render with audio
+### Then
+
+```bash
 npm run audio -- check projects/x
 npm run render -- projects/x out/short.mp4
 ```
+
+**What is verified.** `speak` is tested against an engine with known timing (a tone per letter), and against real
+espeak-ng for word intervals holding speech and the gaps between them being silent; the produced WAV's pauses were
+also checked with ffmpeg's `silencedetect`. `alignToScript` is tested against known-damaged transcripts.
+`transcribe` is tested with a stand-in executable that speaks WhisperX's command line: that proves the wrapper
+(arguments, output discovery, import, errors), **not** WhisperX's accuracy, which has not been run here. The SAPI
+and `say` adapters have not been run either (no Windows or macOS machine here).
 
 Anchors: `{"word": "gambling", "nth": 2, "edge": "start|end", "offset": 0}`; `word` may be a phrase (`"the window"`) and matches ignore case and punctuation. A shot may omit `duration` (it runs to the next shot's start; the last shot runs to `alignment.duration`). Gesture lead (-4 frames) is applied by the engine, so anchor to the word itself.
 
@@ -184,4 +222,6 @@ Anchors: `{"word": "gambling", "nth": 2, "edge": "start|end", "offset": 0}`; `wo
 
 ## Not done yet
 
-Running the aligner model itself (WhisperX/CTC; the importer and everything downstream are tested, the model step is not), TTS, walk cycles / full joint rig (phase 2), physical number props (3), loudness mixing and SFX/music (6), Electron click-to-edit shell (5), WebCodecs export + FFmpeg mixer (6), agents, captions, and a richer set kit.
+- Running the real aligner model (WhisperX) was not possible in the development sandbox; its wrapper and everything downstream are tested.
+- Windows and macOS text-to-speech adapters are untested; the Windows installer is built by CI only.
+- Sets built from glTF assets or AI-generated image backdrops (only procedural sets exist).

@@ -6,6 +6,12 @@
  *   npm run audio -- import-whisper <whisper.json> <alignment.json> [--audio tight.wav] [--map out.wav.map.json]
  *       Convert WhisperX / whisper-timestamped word timestamps into alignment.json.
  *       Pass --map when the words were timed on the ORIGINAL audio.
+ *   npm run audio -- speak <script.txt> <projectDir> [--engine auto|espeak|sapi|say] [--voice v] [--rate n]
+ *       [--timing words|prefix|proportional] [--pause 0.18]
+ *       Text-to-speech: writes <projectDir>/audio/voiceover_tight.wav and alignment.json (timings known, no recognizer).
+ *   npm run audio -- transcribe <audio.wav> <alignment.json> [--script script.txt] [--model small] [--language en]
+ *       [--device cpu|cuda] [--compute-type int8] [--command whisperx]
+ *       Run WhisperX on a recording; --script snaps the words to your script's spelling and fills in missed words.
  *   npm run audio -- mix <projectDir> <master.wav> [--music file.wav] [--no-sfx] [--no-auto]
  *       Mix voiceover + effects + music to a -14 LUFS stereo master and print the levels.
  *   npm run audio -- check <projectDir>
@@ -13,9 +19,10 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { CANONICAL_FPS } from '@shortstudio/schema';
-import { SAMPLE_RATE, clampSilences, decodeAudio, encodeWav16, encodeWavStereo16, importWhisperJson, remapAlignment, type Segment } from '@shortstudio/audio';
+import { SAMPLE_RATE, alignToScript, clampSilences, decodeAudio, encodeWav16, encodeWavStereo16, importWhisperJson, remapAlignment, transcribe, type Segment, type TimingMode } from '@shortstudio/audio';
 import { describeMix, mixProject } from './mixproject';
 import { loadProject } from './project';
+import { speakToProject } from './voiceover';
 
 const a = process.argv.slice(2);
 const cmd = a.shift();
@@ -41,6 +48,26 @@ if (cmd === 'tighten') {
   if (opt.map) {
     const { map } = JSON.parse(readFileSync(opt.map, 'utf8')) as { map: Segment[] };
     alignment = remapAlignment(alignment, map, duration);
+  }
+  writeFileSync(output, JSON.stringify(alignment, null, 2));
+  console.log(`${alignment.words.length} words -> ${output}`);
+} else if (cmd === 'speak') {
+  const [scriptPath, dir] = pos;
+  if (!scriptPath || !dir) throw new Error('usage: speak <script.txt> <projectDir> [--engine auto|espeak|sapi|say] [--voice v] [--rate n] [--timing words|prefix|proportional] [--pause s]');
+  const r = await speakToProject(readFileSync(scriptPath, 'utf8'), dir, {
+    engine: opt.engine, voice: opt.voice, rate: opt.rate ? Number(opt.rate) : undefined, timing: opt.timing as TimingMode | undefined, pause: opt.pause ? Number(opt.pause) : undefined,
+  });
+  console.log(`${r.alignment.words.length} words, ${r.duration.toFixed(2)}s with ${r.engine} (${r.timing} timing) -> ${dir}/audio/voiceover_tight.wav + alignment.json`);
+} else if (cmd === 'transcribe') {
+  const [input, output] = pos;
+  if (!input || !output) throw new Error('usage: transcribe <audio.wav> <alignment.json> [--script file] [--model m] [--language l] [--device d] [--compute-type t] [--command c]');
+  let { alignment } = await transcribe(input, {
+    command: opt.command, model: opt.model, language: opt.language, device: opt.device, computeType: opt['compute-type'], onLog: (l) => console.log(`  ${l}`),
+  });
+  if (opt.script) {
+    const r = alignToScript(alignment, readFileSync(opt.script, 'utf8'));
+    alignment = r.alignment;
+    console.log(`script: ${r.matched}/${alignment.words.length} words matched (${r.exact} exactly), ${r.interpolated} interpolated, ${r.extras} extra words ignored`);
   }
   writeFileSync(output, JSON.stringify(alignment, null, 2));
   console.log(`${alignment.words.length} words -> ${output}`);
@@ -73,5 +100,5 @@ if (cmd === 'tighten') {
     }
   }
 } else {
-  throw new Error('commands: tighten | import-whisper | mix | check');
+  throw new Error('commands: tighten | import-whisper | speak | transcribe | mix | check');
 }

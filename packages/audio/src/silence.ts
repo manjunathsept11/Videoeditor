@@ -90,3 +90,28 @@ export function mapTime(map: readonly Segment[], t: number): number {
   const last = map[map.length - 1]!;
   return last.dstStart + (last.srcEnd - last.srcStart);
 }
+
+/**
+ * Remove silence from both ends of a clip (below `thresholdDb` RMS in `window` blocks), keeping `keep` seconds either
+ * side so the edges are not clipped. Returns the trimmed samples and how much was cut from the front.
+ */
+export function trimSilence(x: Float32Array, sampleRate: number, opts: { thresholdDb?: number; window?: number; keep?: number } = {}): { samples: Float32Array; lead: number; trail: number } {
+  const { thresholdDb = -45, window = 0.005, keep = 0.005 } = opts;
+  const win = Math.max(1, Math.round(window * sampleRate));
+  const thr = 10 ** (thresholdDb / 20);
+  const loud = (i: number) => {
+    let s = 0;
+    const end = Math.min(x.length, i + win);
+    for (let k = i; k < end; k++) s += x[k]! * x[k]!;
+    return Math.sqrt(s / (end - i)) >= thr;
+  };
+  let first = 0;
+  while (first < x.length && !loud(first)) first += win;
+  if (first >= x.length) return { samples: new Float32Array(0), lead: x.length / sampleRate, trail: 0 };
+  let last = x.length - 1;
+  while (last > first && !loud(Math.max(0, last - win + 1))) last -= win;
+  const pad = Math.round(keep * sampleRate);
+  const from = Math.max(0, first - pad);
+  const to = Math.min(x.length, last + 1 + pad);
+  return { samples: x.slice(from, to), lead: from / sampleRate, trail: (x.length - to) / sampleRate };
+}
