@@ -6,3 +6,4 @@ export * from './normals';
 export { Studio } from './studio';
 export * from './propState';
 export * from './propMeshes';
+export * from './rig';

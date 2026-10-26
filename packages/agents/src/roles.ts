@@ -166,6 +166,14 @@ export function buildShot(provider: LlmProvider, input: BuildShotInput): Promise
         else if (t < start - 0.05 || t >= end + 0.05) {
           issues.push(`events[${k}] anchors "${e.at.word}" at ${t.toFixed(2)}s, outside this shot (${start.toFixed(2)}-${end.toFixed(2)}s); pick a word inside it`);
         }
+        if (e.type === 'walk') {
+          if (typeof e.until === 'number') issues.push(`events[${k}].until must be a word anchor, not seconds`);
+          else {
+            const u = resolveAnchor(alignment, e.until);
+            if (typeof u === 'string') issues.push(`events[${k}].until: ${u}`);
+            else if (typeof t === 'number' && u <= t) issues.push(`events[${k}] walk ends at ${u.toFixed(2)}s, not after it starts at ${t.toFixed(2)}s`);
+          }
+        }
       });
       const propIds = new Map(s.props.map((p) => [p.id, p.kind]));
       s.propEvents.forEach((e, k) => {

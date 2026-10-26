@@ -105,6 +105,10 @@ export function resolveShots(
     }
     const events = src.events.flatMap((e, k) => {
       const at = time(e.at, `shot "${src.id}" events[${k}]`);
+      if (e.type === 'walk') {
+        const until = time(e.until, `shot "${src.id}" events[${k}].until`);
+        return at === undefined || until === undefined ? [] : [{ ...e, at, until } as Shot['events'][number]];
+      }
       return at === undefined ? [] : [{ ...e, at } as Shot['events'][number]];
     });
     const propEvents = src.propEvents.flatMap((e, k) => {

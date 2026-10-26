@@ -13,6 +13,7 @@ Deterministic, code-driven 3D engine for 9:16 explainer shorts. Full design: [do
 | `packages/agents` | Director -> Set Designer -> Scene Builder, validated and self-repairing; Claude API and local-CLI backends behind one interface |
 | `apps/render` | Headless renderer (Vite + Playwright -> PNG frames -> ffmpeg -> MP4, muxes the voiceover) and the `audio` CLI |
 | `examples/demo` | 4-shot sample project with hand-typed times |
+| `examples/rig` | A walk across the set (foot-locked, with the bob and arm swing), a gesture, and a jolt |
 | `examples/props` | The five number props (counter, dial, calendar, clock, magnifier), each landing on a spoken word |
 | `examples/anchored` | Same shots authored against words (`"at": {"word": "gambling"}`) + a sample `audio/alignment.json` |
 
@@ -41,6 +42,26 @@ answer. Floor gaps are repaired deterministically at set level. `--provider cli`
 (`--cli gemini --cli-args "-p"`). `render` runs the gate first and refuses to render a broken project unless you pass `--force`.
 Captions come from the alignment (lower 30%, white with black stroke, 3 words per line) and can be switched off or given a
 highlight colour for the spoken word in `project.json` (`"captions": {"enabled": true, "highlight": "#ffe14a"}`).
+
+## Body motion: walk and jolt
+
+A real joint hierarchy (pelvis, torso, head, shoulders -> elbows, hips -> knees -> feet). Everything is a pure function of time
+(`engine/src/rig.ts`), so any frame renders alone.
+
+```json
+{"type": "walk", "actor": "ken", "at": {"word": "door"}, "until": {"word": "makes"}, "to": [1.5, 1.0], "turn": true}
+{"type": "jolt", "actor": "mio", "at": {"word": "legal"}, "height": 0.5}
+```
+
+- **Foot lock by construction:** every planted foot is one fixed world point for its whole stance and the legs are solved to reach it
+  with two-bone IK, so feet cannot slide. The only way to break it is a stride the legs cannot span, which the quality gate reports
+  (`foot-slide`) with a duration that is known to fit.
+- **Cadence and bob:** a step every 5-6 frames (the step time adapts so the walk lands exactly on `until`), hips bob 7% of head
+  height peak to peak, arms swing opposite the legs. Speed ramps over the first and last step so nothing pops.
+- **Turning:** the actor turns into the direction of travel over the first two steps and back over the last two, so a planted
+  foot never twists under the hip. `"turn": false` strafes without turning.
+- **Jolt:** up 50% of a head height in 2 frames, hold, settle. The legs hang with the body.
+- Idle is dead still: with no events active, every joint is a constant.
 
 ## Number props
 

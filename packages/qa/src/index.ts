@@ -6,3 +6,4 @@ export * from './fix';
 export * from './gate';
 export * from './floor';
 export * from './propsInFrame';
+export * from './feet';

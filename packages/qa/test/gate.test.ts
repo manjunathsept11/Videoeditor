@@ -180,3 +180,58 @@ describe('props in frame: camera creep', () => {
     expect(checkShot(long.shots.a!, long.sets.s!).map((i) => i.check)).toContain('prop-out-of-frame');
   });
 });
+
+describe('moving actors', () => {
+  const moving = (events: object[], objects: object[] = [ground], duration = 6) =>
+    parseBundle({
+      project: { name: 't', sets: ['s'], shots: ['a'] },
+      sets: [set(objects)],
+      shots: [{ id: 'a', set: 's', start: 0, duration, camera: cam, actors: [actor('a', [0, 0, 0])], events }],
+    });
+  const walk = (at: number, until: number, to: number[]) => ({ type: 'walk', actor: 'a', at, until, to });
+
+  it('flags an actor who walks out of the frame even though they start inside it', () => {
+    const b = moving([walk(1, 4, [6, 0])]);
+    const issues = checkShot(b.shots.a!, b.sets.s!);
+    expect(issues.map((i) => i.check)).toContain('head-cropped');
+    expect(issues.find((i) => i.check === 'head-cropped')!.message).toMatch(/at \d\.\d\ds/); // mid-walk, not at the start
+  });
+  it('passes a walk that stays in frame', () => {
+    const b = moving([walk(1, 4, [0.8, 0.5])]);
+    expect(checkShot(b.shots.a!, b.sets.s!).filter((i) => i.severity === 'error')).toEqual([]);
+  });
+  it('flags a walk through a prop, which the start position alone would never show', () => {
+    const wall = { kind: 'box', id: 'crate', position: [1.5, 0.6, 0], size: [1, 1.2, 1], color: '#664422' };
+    const b = moving([walk(1, 4, [3, 0])], [ground, wall]);
+    const c = checkShot(b.shots.a!, b.sets.s!).find((i) => i.check === 'prop-clipping')!;
+    expect(c.message).toMatch(/crate/);
+  });
+  it('reports a stride the legs cannot span, with a duration that fits', () => {
+    const b = moving([walk(1, 2, [5, 0])]);
+    const f = checkShot(b.shots.a!, b.sets.s!).find((i) => i.check === 'foot-slide')!;
+    expect(f.severity).toBe('error');
+    expect(f.message).toMatch(/planted foot would slide/);
+    expect(f.message).toMatch(/at least \d+\.\d\ds long/);
+  });
+  it('the suggested duration actually fixes it', () => {
+    const slow = moving([walk(1, 2, [5, 0])]);
+    const need = Number(/at least (\d+\.\d\d)s long/.exec(checkShot(slow.shots.a!, slow.sets.s!).find((i) => i.check === 'foot-slide')!.message)![1]);
+    for (const extra of [0, 0.05, 0.1]) {
+      const fixed = moving([walk(1, 1 + need + extra, [5, 0])], [ground], 9);
+      expect(checkShot(fixed.shots.a!, fixed.sets.s!).map((i) => i.check), `need ${need} + ${extra}`).not.toContain('foot-slide');
+    }
+  });
+  it('a jolt that throws the head out of a tight frame is caught at the peak', () => {
+    const tight = { position: [0, 1.4, 2.2], target: [0, 1.4, 0], fov: 40 }; // frame top at ~2.2: eyes at 1.75 fit, but 2.25 (after the jolt) does not
+    const mk = (events: object[]) =>
+      parseBundle({
+        project: { name: 't', sets: ['s'], shots: ['a'] },
+        sets: [set([ground])],
+        shots: [{ id: 'a', set: 's', start: 0, duration: 0.5, camera: tight, actors: [actor('a', [0, 0, 0])], events }],
+      });
+    const still = mk([]);
+    const jolted = mk([{ type: 'jolt', actor: 'a', at: 0.1 }]);
+    expect(checkShot(still.shots.a!, still.sets.s!).filter((i) => i.severity === 'error')).toEqual([]);
+    expect(checkShot(jolted.shots.a!, jolted.sets.s!).some((i) => i.check === 'head-cropped')).toBe(true);
+  });
+});

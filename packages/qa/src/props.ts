@@ -1,5 +1,6 @@
 import type { SetDef, Shot } from '@shortstudio/schema';
-import { HEAD_CENTER_Y, sampleTimes, type Issue } from './framing';
+import { rigAt } from '@shortstudio/engine/pure';
+import { HEAD_CENTER_Y, shotSampleTimes, type Issue } from './framing';
 import { cameraAt, type V3 } from './projection';
 import { segmentEntersBox, solidsOf, type Solid } from './solids';
 
@@ -13,12 +14,13 @@ export function checkObjectOcclusion(shot: Shot, set: SetDef, samples = 3): Issu
   const solids = solidsOf(set);
   const issues: Issue[] = [];
   const seen = new Set<string>();
-  for (const t of sampleTimes(shot.duration, samples)) {
+  for (const t of shotSampleTimes(shot, samples)) {
     const cam = cameraAt(shot.camera, t);
     for (const a of shot.actors) {
-      const head: V3 = [a.position[0], a.scale * HEAD_CENTER_Y, a.position[2]];
+      const [x, jy, z] = rigAt(shot, a, shot.start + t).root;
+      const head: V3 = [x, jy + a.scale * HEAD_CENTER_Y, z];
       for (const s of solids) {
-        if (insideXZ(s, a.position[0], a.position[2], 0)) continue; // that is clipping, reported separately
+        if (insideXZ(s, x, z, 0)) continue; // that is clipping, reported separately
         const hit = segmentEntersBox(cam.position, head, s);
         if (hit !== null && hit < 0.995) {
           const key = `${a.id}|${s.id}`;
@@ -41,16 +43,21 @@ const insideXZ = (s: Solid, x: number, z: number, r: number) =>
 /** An actor standing inside a prop at hip height. */
 export function checkClipping(shot: Shot, set: SetDef): Issue[] {
   const issues: Issue[] = [];
-  for (const a of shot.actors) {
-    for (const s of solidsOf(set)) {
-      const lo = HIP_BAND[0] * a.scale;
-      const hi = HIP_BAND[1] * a.scale;
-      if (s.max[1] <= lo || s.min[1] >= hi) continue;
-      if (insideXZ(s, a.position[0], a.position[2], BODY_RADIUS * a.scale)) {
-        issues.push({
-          check: 'prop-clipping', severity: 'error', shot: shot.id, actor: a.id,
-          message: `${a.id} at (${a.position[0].toFixed(1)}, ${a.position[2].toFixed(1)}) is inside "${s.id}"; move the actor out of the prop`,
-        });
+  const seen = new Set<string>();
+  for (const t of shotSampleTimes(shot, 3)) {
+    for (const a of shot.actors) {
+      const [x, jy, z] = rigAt(shot, a, shot.start + t).root;
+      for (const s of solidsOf(set)) {
+        const lo = HIP_BAND[0] * a.scale + jy;
+        const hi = HIP_BAND[1] * a.scale + jy;
+        if (s.max[1] <= lo || s.min[1] >= hi) continue;
+        if (insideXZ(s, x, z, BODY_RADIUS * a.scale) && !seen.has(`${a.id}|${s.id}`)) {
+          seen.add(`${a.id}|${s.id}`);
+          issues.push({
+            check: 'prop-clipping', severity: 'error', shot: shot.id, actor: a.id,
+            message: `${a.id} at (${x.toFixed(1)}, ${z.toFixed(1)}) at ${t.toFixed(2)}s is inside "${s.id}"; move the actor (or the walk path) out of the prop`,
+          });
+        }
       }
     }
   }

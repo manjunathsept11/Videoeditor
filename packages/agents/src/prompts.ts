@@ -97,6 +97,10 @@ Numbers are physical objects here, never text overlays. Whenever the voiceover s
  - events: gestures and expressions anchored to words:
      {"type":"gesture","actor":"ken","at":{"word":"gambling"},"gesture":"point"|"raise","hand":"left"|"right","hold":0.8}
      {"type":"expression","actor":"ken","at":{"word":"gambling"},"expression":"neutral"|"happy"|"panic"}
+     {"type":"walk","actor":"ken","at":{"word":"door"},"until":{"word":"makes"},"to":[1.5,1.0],"turn":true}
+     {"type":"jolt","actor":"ken","at":{"word":"legal"},"height":0.5}
+   walk: the actor walks a straight line from where they stand to [x,z], starting on the "at" word and arriving by the "until" word (anchor both). They face the direction of travel and turn back on arrival; "turn":false strafes without turning. Feet are planted by IK, so a walk must not be too fast: allow about 0.6 seconds per unit of distance or more (3 units needs 1.8s+). Never walk through props, and keep the whole path inside the frame (the camera creeps in).
+   jolt: a shock reaction; the actor jumps 50% of a head height in two frames on the word. Pair it with a "panic" expression.
    An expression change blinks in 2 frames then snaps, so use them sparingly on emotional beats. Idle actors stay perfectly still on purpose.
  - transitionIn: {"type":"cut"|"dissolve","frames":6} from the storyboard.
 

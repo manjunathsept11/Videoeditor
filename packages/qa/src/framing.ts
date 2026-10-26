@@ -1,4 +1,5 @@
 import { CANONICAL_FPS, type Shot } from '@shortstudio/schema';
+import { rigAt, walkPlans } from '@shortstudio/engine/pure';
 import { cameraAt, project, type V3 } from './projection';
 
 export type Severity = 'error' | 'warning';
@@ -32,6 +33,23 @@ export const sampleTimes = (duration: number, n: number): number[] =>
   Array.from({ length: Math.max(2, n) }, (_, s) => (duration * s) / (Math.max(2, n) - 1));
 
 /**
+ * Times (seconds into the shot) worth checking: evenly spread, plus the start, middle and end of every
+ * walk and each jolt's peak, because that is where actors are somewhere new.
+ */
+export function shotSampleTimes(shot: Shot, n = 3): number[] {
+  const ts = new Set(sampleTimes(shot.duration, n).map((t) => +t.toFixed(4)));
+  const add = (t: number) => {
+    const local = t - shot.start;
+    if (local >= 0 && local <= shot.duration) ts.add(+local.toFixed(4));
+  };
+  for (const a of shot.actors) {
+    for (const p of walkPlans(shot, a)) [p.t0, (p.t0 + p.t1) / 2, p.t1].forEach(add);
+  }
+  for (const e of shot.events) if (e.type === 'jolt') add(e.at + 0.07);
+  return [...ts].sort((x, y) => x - y);
+}
+
+/**
  * Per-shot framing, evaluated at both ends of the shot because the camera creeps in the whole time.
  *  - eyes must be inside the frame (error); a cropped scalp with visible eyes is allowed for close-ups (warning)
  *  - faces must sit above the caption zone
@@ -49,13 +67,13 @@ export function checkFraming(shot: Shot, opts: FramingOptions = {}): Issue[] {
     }
   };
 
-  for (const t of sampleTimes(shot.duration, opts.samples ?? 3)) {
+  for (const t of shotSampleTimes(shot, opts.samples ?? 3)) {
     const cam = cameraAt(shot.camera, t);
     const tanHalf = Math.tan((cam.fov * Math.PI) / 360);
     const when = `at ${t.toFixed(2)}s (frame ${Math.round(t * CANONICAL_FPS)})`;
     for (const a of shot.actors) {
-      const [x, , z] = a.position;
-      const center = project(cam, [x, a.scale * HEAD_CENTER_Y, z], aspect);
+      const [x, jy, z] = rigAt(shot, a, shot.start + t).root; // where the actor actually is at this moment
+      const center = project(cam, [x, jy + a.scale * HEAD_CENTER_Y, z], aspect);
       if (!center) {
         add({ check: 'behind-camera', severity: 'error', shot: shot.id, actor: a.id, message: `${a.id} is behind the camera ${when}` });
         continue;
@@ -64,7 +82,7 @@ export function checkFraming(shot: Shot, opts: FramingOptions = {}): Issue[] {
       let eyesOut = false;
       for (const sx of [-1, 1]) {
         for (const sy of [-1, 1]) {
-          const p = project(cam, [x + sx * a.scale * EYE_HALF_SPREAD, a.scale * (EYE_Y + sy * EYE_HALF_HEIGHT), z], aspect);
+          const p = project(cam, [x + sx * a.scale * EYE_HALF_SPREAD, jy + a.scale * (EYE_Y + sy * EYE_HALF_HEIGHT), z], aspect);
           if (!p || Math.abs(p.x) > 1 || Math.abs(p.y) > 1) eyesOut = true;
         }
       }

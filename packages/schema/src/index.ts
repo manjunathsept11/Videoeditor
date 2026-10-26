@@ -107,6 +107,24 @@ const makeActorEvent = <T extends z.ZodTypeAny>(time: T) =>
       at: time,
       expression: ExpressionId,
     }),
+    z.object({
+      type: z.literal('walk'),
+      actor: Id,
+      /** The walk starts here and the actor has arrived by `until`: anchor both to words. */
+      at: time,
+      until: time,
+      /** Destination on the floor, [x, z]. The actor walks a straight line from where they stand. */
+      to: Vec2,
+      /** Face the direction of travel while walking, then turn back. False strafes without turning. */
+      turn: z.boolean().default(true),
+    }),
+    z.object({
+      type: z.literal('jolt'),
+      actor: Id,
+      at: time,
+      /** Jump height as a fraction of head height (spec: shock is 50% in 2 frames). */
+      height: z.number().positive().default(0.5),
+    }),
   ]);
 export const ActorEvent = makeActorEvent(z.number());
 export const ActorEventSource = makeActorEvent(TimeRef);
@@ -325,6 +343,9 @@ export function parseBundle(
       if (!actorIds.has(e.actor)) issues.push(`shot "${shot.id}" event targets unknown actor "${e.actor}"`);
     }
     if (actorIds.size !== shot.actors.length) issues.push(`shot "${shot.id}" has duplicate actor ids`);
+    for (const e of shot.events) {
+      if (e.type === 'walk' && !(e.until > e.at)) issues.push(`shot "${shot.id}" walk by "${e.actor}" must end after it starts (until ${e.until} <= at ${e.at})`);
+    }
     const props = new Map(shot.props.map((p) => [p.id, p]));
     if (props.size !== shot.props.length) issues.push(`shot "${shot.id}" has duplicate prop ids`);
     for (const e of shot.propEvents) {

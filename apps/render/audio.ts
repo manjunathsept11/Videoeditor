@@ -50,7 +50,8 @@ if (cmd === 'tighten') {
     const s = bundle.shots[id]!;
     console.log(`\n${s.id}  ${s.start.toFixed(3)}s (f${frame(s.start)}) +${s.duration.toFixed(3)}s  set=${s.set}  in=${s.transitionIn.type}`);
     for (const e of s.events) {
-      const detail = e.type === 'gesture' ? `${e.gesture}/${e.hand}` : e.expression;
+      const detail =
+        e.type === 'gesture' ? `${e.gesture}/${e.hand}` : e.type === 'expression' ? e.expression : e.type === 'walk' ? `-> (${e.to}) by ${e.until.toFixed(2)}s` : `${e.height * 100}% head`;
       console.log(`   ${e.type.padEnd(10)} ${e.actor.padEnd(5)} ${detail.padEnd(12)} word@${e.at.toFixed(3)}s (f${frame(e.at)})`);
     }
     for (const e of s.propEvents) {
