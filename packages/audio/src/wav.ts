@@ -28,3 +28,23 @@ export function encodeWav16(samples: Float32Array, sampleRate = SAMPLE_RATE): Bu
   h.write('data', 36); h.writeUInt32LE(data.length, 40);
   return Buffer.concat([h, data]);
 }
+
+/** 16-bit PCM stereo WAV from two channels. */
+export function encodeWavStereo16(left: Float32Array, right: Float32Array, sampleRate = SAMPLE_RATE): Buffer {
+  const n = Math.min(left.length, right.length);
+  const data = Buffer.alloc(n * 4);
+  const q = (v: number) => {
+    const c = Math.max(-1, Math.min(1, v));
+    return Math.round(c < 0 ? c * 0x8000 : c * 0x7fff);
+  };
+  for (let i = 0; i < n; i++) {
+    data.writeInt16LE(q(left[i]!), i * 4);
+    data.writeInt16LE(q(right[i]!), i * 4 + 2);
+  }
+  const h = Buffer.alloc(44);
+  h.write('RIFF', 0); h.writeUInt32LE(36 + data.length, 4); h.write('WAVE', 8);
+  h.write('fmt ', 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(2, 22);
+  h.writeUInt32LE(sampleRate, 24); h.writeUInt32LE(sampleRate * 4, 28); h.writeUInt16LE(4, 32); h.writeUInt16LE(16, 34);
+  h.write('data', 36); h.writeUInt32LE(data.length, 40);
+  return Buffer.concat([h, data]);
+}

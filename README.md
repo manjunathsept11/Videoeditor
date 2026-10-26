@@ -8,7 +8,8 @@ Deterministic, code-driven 3D engine for 9:16 explainer shorts. Full design: [do
 |:--|:--|
 | `packages/schema` | zod schemas for `project.json`, `sets/*.json`, `shots/*.json` + cross-reference validation (`parseBundle`) |
 | `packages/engine` | The six animation rules as pure functions (`rules.ts`), pose/timeline resolution (no WebGL, unit-tested), and the Three.js layer (`Studio`, WhiteLift + inverted-hull shaders, mannequin, procedural set kit) |
-| `packages/audio` | Silence clamping (no pause > 0.2s) with a source-to-output time map, WAV I/O, WhisperX / whisper-timestamped importer |
+| `packages/audio` | Silence clamping with a source-to-output time map, WhisperX importer, BS.1770 loudness meter, synthesized SFX, timeline-driven cues, the mixer (-14 LUFS master) |
+| `packages/export` | WebCodecs + mp4-muxer video export (frame N is rendered at t = N / fps; H.264, falling back to VP9/AV1) |
 | `packages/qa` | Quality gate: framing/eye-line/caption-zone, blocked views, prop clipping, floor coverage; each with an auto-fix |
 | `packages/agents` | Director -> Set Designer -> Scene Builder, validated and self-repairing; Claude API and local-CLI backends behind one interface |
 | `apps/render` | Headless renderer (Vite + Playwright -> PNG frames -> ffmpeg -> MP4, muxes the voiceover) and the `audio` CLI |
@@ -43,6 +44,37 @@ answer. Floor gaps are repaired deterministically at set level. `--provider cli`
 (`--cli gemini --cli-args "-p"`). `render` runs the gate first and refuses to render a broken project unless you pass `--force`.
 Captions come from the alignment (lower 30%, white with black stroke, 3 words per line) and can be switched off or given a
 highlight colour for the spoken word in `project.json` (`"captions": {"enabled": true, "highlight": "#ffe14a"}`).
+
+## Export and sound
+
+```bash
+npm run export -- projects/x out/short.mp4                  # 1080x1920, project fps (30)
+npm run export -- projects/x out/short.mp4 --fps 60 --music beat.wav
+npm run audio -- mix projects/x out/master.wav              # just the audio master + a report of every level
+```
+
+**Video** is encoded in the engine with WebCodecs (`packages/export`), not screen-captured: frame N is rendered at exactly t = N / fps and
+handed to a `VideoEncoder` with an exact microsecond timestamp. H.264 High (level 4.2) is used when the browser has it, otherwise
+VP9/AV1 (ffmpeg then transcodes to H.264). ffmpeg only attaches the audio.
+
+**Audio** is mixed in code, with the voiceover as the 0 LU anchor:
+
+| stem | level | notes |
+|:--|:--|:--|
+| voiceover | 0 LU (its measured loudness) | the anchor |
+| hits: impact, tick, ding, footsteps | -10 LU | measured over each effect's own duration |
+| whooshes, page flips | -15 LU | |
+| music (`audio/music_bed.wav` or `--music`) | -18 LU | looped, trimmed, faded, **never ducked** |
+| master | **-14 LUFS**, true peak <= -1 dBTP | iterates gain + a lookahead limiter until both hold |
+
+Effects are **synthesized** (deterministic, royalty-free) and **derived from the timeline**, landing on the exact frames the engine uses:
+a whoosh into each shot change, a tick/ding/page-flip where each prop reaches its value, an impact on every jolt, and one footstep
+cue per walk with a footfall at every step the foot-lock rig plants. Density is capped at 20/min by priority (`--max-sfx n` changes it) and
+a long video with fewer than 12/min is flagged. Hand-written cues go in `audio/sfx_manifest.json`
+(`{"cues": [{"at": {"word": "boom"}, "kind": "impact", "gain": 2}, {"at": 5, "kind": "whoosh", "file": "my.wav"}]}`); they outrank auto cues.
+
+The loudness meter is written from BS.1770-4 (exact ITU coefficients at 48 kHz) and is checked against ffmpeg's `ebur128` in the tests:
+within 0.04 LU and 0.03 dB of true peak. `npm run test:e2e` runs a real export and judges it with ffprobe/ebur128.
 
 ## Sets and look
 

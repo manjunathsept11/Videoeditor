@@ -6,12 +6,15 @@
  *   npm run audio -- import-whisper <whisper.json> <alignment.json> [--audio tight.wav] [--map out.wav.map.json]
  *       Convert WhisperX / whisper-timestamped word timestamps into alignment.json.
  *       Pass --map when the words were timed on the ORIGINAL audio.
+ *   npm run audio -- mix <projectDir> <master.wav> [--music file.wav] [--no-sfx] [--no-auto]
+ *       Mix voiceover + effects + music to a -14 LUFS stereo master and print the levels.
  *   npm run audio -- check <projectDir>
  *       Resolve word anchors and print the timeline (seconds and 30fps frames).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { CANONICAL_FPS } from '@shortstudio/schema';
-import { SAMPLE_RATE, clampSilences, decodeAudio, encodeWav16, importWhisperJson, remapAlignment, type Segment } from '@shortstudio/audio';
+import { SAMPLE_RATE, clampSilences, decodeAudio, encodeWav16, encodeWavStereo16, importWhisperJson, remapAlignment, type Segment } from '@shortstudio/audio';
+import { describeMix, mixProject } from './mixproject';
 import { loadProject } from './project';
 
 const a = process.argv.slice(2);
@@ -41,6 +44,16 @@ if (cmd === 'tighten') {
   }
   writeFileSync(output, JSON.stringify(alignment, null, 2));
   console.log(`${alignment.words.length} words -> ${output}`);
+} else if (cmd === 'mix') {
+  const [dir, out] = pos;
+  if (!dir || !out) throw new Error('usage: mix <projectDir> <master.wav> [--music file] [--no-sfx] [--no-auto] [--max-sfx n]');
+  const { bundle, voiceover } = loadProject(dir);
+  const m = mixProject(dir, bundle, voiceover, { music: opt.music, noAuto: 'no-auto' in opt, noSfx: 'no-sfx' in opt, maxSfxPerMinute: opt['max-sfx'] ? Number(opt['max-sfx']) : undefined });
+  for (const l of describeMix(m)) console.log(l);
+  if (!m.hasAudio) throw new Error('nothing to mix: no voiceover, effects or music');
+  writeFileSync(out, encodeWavStereo16(m.master, m.master));
+  writeFileSync(`${out}.json`, JSON.stringify(m.report, (_, v) => (v === -Infinity ? null : v), 2));
+  console.log(`wrote ${out} and ${out}.json`);
 } else if (cmd === 'check') {
   const [dir] = pos;
   if (!dir) throw new Error('usage: check <projectDir>');
@@ -60,5 +73,5 @@ if (cmd === 'tighten') {
     }
   }
 } else {
-  throw new Error('commands: tighten | import-whisper | check');
+  throw new Error('commands: tighten | import-whisper | mix | check');
 }

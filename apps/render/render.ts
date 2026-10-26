@@ -13,29 +13,14 @@
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright';
-import { createServer } from 'vite';
+import { dirname, resolve } from 'node:path';
 import { runQualityGate } from '@shortstudio/qa';
 import { loadProject } from './project';
 import { printGate } from './qa';
-
-const here = dirname(fileURLToPath(import.meta.url));
-
-function args() {
-  const pos: string[] = [];
-  const opt: Record<string, string> = {};
-  const a = process.argv.slice(2);
-  for (let i = 0; i < a.length; i++) {
-    if (a[i]!.startsWith('--')) opt[a[i]!.slice(2)] = a[++i] ?? '';
-    else pos.push(a[i]!);
-  }
-  return { pos, opt };
-}
+import { openStudio, parseArgs } from './session';
 
 async function main() {
-  const { pos, opt } = args();
+  const { pos, opt } = parseArgs(process.argv.slice(2));
   const [projectDir, outPath] = pos;
   if (!projectDir || !outPath) throw new Error('usage: render <projectDir> <out.mp4|out.png> [--scale s] [--fps 30|60] [--frame n]');
 
@@ -53,27 +38,8 @@ async function main() {
   const width = Math.round((bundle.project.width * scale) / 2) * 2;
   const height = Math.round((bundle.project.height * scale) / 2) * 2;
 
-  const server = await createServer({
-    root: join(here, 'web'),
-    server: { port: 0, host: '127.0.0.1' },
-    logLevel: 'error',
-    configFile: false,
-  });
-  await server.listen();
-  const url = server.resolvedUrls!.local[0]!;
-
-  const browser = await chromium.launch({
-    args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-  });
+  const { page, duration, close } = await openStudio(bundle, width, height);
   try {
-    const page = await browser.newPage({ viewport: { width, height } });
-    page.on('pageerror', (e) => console.error('[page error]', e.message));
-    page.on('console', (m) => { if (m.type() === 'error') console.error('[page]', m.text()); });
-    await page.goto(url);
-    await page.waitForFunction(() => (window as unknown as { ready?: boolean }).ready === true);
-    const duration = await page.evaluate(([w, h, b]) => window.studioApi.init(w as number, h as number, b as never), [width, height, bundle] as const);
-    await page.evaluate(() => document.fonts.ready);
-
     const total = Math.round(duration * fps);
     mkdirSync(resolve(dirname(outPath)), { recursive: true });
 
@@ -108,8 +74,7 @@ async function main() {
     await done;
     console.log(`\n${total} frames @ ${fps}fps ${width}x${height} -> ${outPath} (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   } finally {
-    await browser.close();
-    await server.close();
+    await close();
   }
 }
 
