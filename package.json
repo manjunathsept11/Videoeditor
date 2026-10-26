@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "render": "tsx apps/render/render.ts"
+    "render": "tsx apps/render/render.ts",
+    "audio": "tsx apps/render/audio.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

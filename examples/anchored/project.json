@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "name": "Anchored demo",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "sets": [
+    "neon_street",
+    "pachinko_hall"
+  ],
+  "shots": [
+    "shot_01",
+    "shot_02",
+    "shot_03",
+    "shot_04"
+  ]
+}

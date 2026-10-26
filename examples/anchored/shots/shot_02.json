@@ -1,0 +1,66 @@
+{
+  "id": "shot_02",
+  "set": "pachinko_hall",
+  "start": {
+    "word": "But"
+  },
+  "camera": {
+    "position": [
+      0,
+      1.8,
+      9.5
+    ],
+    "target": [
+      0,
+      1.9,
+      -6
+    ],
+    "fov": 46
+  },
+  "transitionIn": {
+    "type": "dissolve",
+    "frames": 6
+  },
+  "actors": [
+    {
+      "id": "ken",
+      "bodyColor": "#ff7a1a",
+      "position": [
+        -1.1,
+        0,
+        0
+      ],
+      "facingY": 0.3
+    },
+    {
+      "id": "mio",
+      "bodyColor": "#7a4dff",
+      "position": [
+        1.1,
+        0,
+        -0.4
+      ],
+      "facingY": -0.3,
+      "glasses": true
+    }
+  ],
+  "events": [
+    {
+      "type": "expression",
+      "actor": "mio",
+      "at": {
+        "word": "prize"
+      },
+      "expression": "panic"
+    },
+    {
+      "type": "gesture",
+      "actor": "mio",
+      "at": {
+        "word": "counter"
+      },
+      "gesture": "raise",
+      "hand": "left"
+    }
+  ]
+}

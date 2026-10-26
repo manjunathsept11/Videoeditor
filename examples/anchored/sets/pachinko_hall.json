@@ -1,0 +1,21 @@
+{
+  "id": "pachinko_hall",
+  "lighting": "cinema",
+  "background": "#20101a",
+  "fog": { "color": "#20101a", "near": 8, "far": 30 },
+  "objects": [
+    { "kind": "floor", "id": "carpet", "size": [24, 40], "color": "#7a1620", "position": [0, 0, -8] },
+    { "kind": "box", "id": "back_wall", "position": [0, 4, -14], "size": [24, 8, 0.5], "color": "#3a1030" },
+    { "kind": "box", "id": "machine_a", "position": [-4.4, 1.5, -6], "size": [1.6, 3, 1.4], "color": "#2b2b4a", "emissive": "#5a3cff", "emissiveIntensity": 0.5 },
+    { "kind": "box", "id": "machine_b", "position": [-2.2, 1.5, -6], "size": [1.6, 3, 1.4], "color": "#2b2b4a", "emissive": "#ff3d8a", "emissiveIntensity": 0.5 },
+    { "kind": "box", "id": "machine_c", "position": [0, 1.5, -6], "size": [1.6, 3, 1.4], "color": "#2b2b4a", "emissive": "#ffd23d", "emissiveIntensity": 0.5 },
+    { "kind": "box", "id": "machine_d", "position": [2.2, 1.5, -6], "size": [1.6, 3, 1.4], "color": "#2b2b4a", "emissive": "#3dd6ff", "emissiveIntensity": 0.5 },
+    { "kind": "box", "id": "machine_e", "position": [4.4, 1.5, -6], "size": [1.6, 3, 1.4], "color": "#2b2b4a", "emissive": "#ff3d8a", "emissiveIntensity": 0.5 },
+    { "kind": "box", "id": "machine_f", "position": [-3.3, 1.5, -10], "size": [1.6, 3, 1.4], "color": "#2b2b4a", "emissive": "#ffd23d", "emissiveIntensity": 0.5 },
+    { "kind": "box", "id": "machine_g", "position": [0, 1.5, -10], "size": [1.6, 3, 1.4], "color": "#2b2b4a", "emissive": "#5a3cff", "emissiveIntensity": 0.5 },
+    { "kind": "box", "id": "machine_h", "position": [3.3, 1.5, -10], "size": [1.6, 3, 1.4], "color": "#2b2b4a", "emissive": "#3dd6ff", "emissiveIntensity": 0.5 },
+    { "kind": "sign", "id": "sign_jackpot", "position": [0, 6, -13.6], "size": [7, 1.5], "text": "大当たり JACKPOT", "color": "#ffe14a", "background": "#1a0d00" },
+    { "kind": "light", "id": "hall_warm", "position": [0, 6, -4], "color": "#ffa24d", "intensity": 90, "distance": 18 },
+    { "kind": "light", "id": "hall_pink", "position": [-3, 3, -8], "color": "#ff3d8a", "intensity": 40, "distance": 10 }
+  ]
+}

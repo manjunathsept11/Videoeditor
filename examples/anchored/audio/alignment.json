@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "duration": 7.0,
+  "_note": "Hand-written SAMPLE timings for the script; real projects generate this with `npm run audio -- import-whisper`.",
+  "words": [
+    {
+      "text": "Japan",
+      "start": 0.15,
+      "end": 0.55
+    },
+    {
+      "text": "bans",
+      "start": 0.55,
+      "end": 0.95
+    },
+    {
+      "text": "gambling.",
+      "start": 0.95,
+      "end": 1.55
+    },
+    {
+      "text": "But",
+      "start": 1.75,
+      "end": 1.95
+    },
+    {
+      "text": "the",
+      "start": 1.95,
+      "end": 2.05
+    },
+    {
+      "text": "prize",
+      "start": 2.05,
+      "end": 2.45
+    },
+    {
+      "text": "counter",
+      "start": 2.45,
+      "end": 2.95
+    },
+    {
+      "text": "next",
+      "start": 2.95,
+      "end": 3.2
+    },
+    {
+      "text": "door",
+      "start": 3.2,
+      "end": 3.55
+    },
+    {
+      "text": "makes",
+      "start": 3.55,
+      "end": 3.8
+    },
+    {
+      "text": "it",
+      "start": 3.8,
+      "end": 3.95
+    },
+    {
+      "text": "legal.",
+      "start": 3.95,
+      "end": 4.5
+    },
+    {
+      "text": "Pachinko",
+      "start": 4.7,
+      "end": 5.3
+    },
+    {
+      "text": "balls",
+      "start": 5.3,
+      "end": 5.7
+    },
+    {
+      "text": "turn",
+      "start": 5.7,
+      "end": 5.95
+    },
+    {
+      "text": "into",
+      "start": 5.95,
+      "end": 6.2
+    },
+    {
+      "text": "cash.",
+      "start": 6.2,
+      "end": 6.7
+    }
+  ]
+}

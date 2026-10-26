@@ -4,15 +4,18 @@
  *   npm run render -- examples/demo out/demo.mp4 [--scale 0.5] [--fps 30]
  *   npm run render -- examples/demo out/f.png --frame 20 [--scale 0.5]
  *
+ * If the project has audio/voiceover_tight.wav (or --audio is given) it is muxed in.
+ * Word anchors resolve against audio/alignment.json.
+ *
  * Frames are stepped by index, never by wall clock: frame N always renders t = N / fps.
  */
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
-import { parseBundle } from '@shortstudio/schema';
+import { loadProject } from './project';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -27,20 +30,12 @@ function args() {
   return { pos, opt };
 }
 
-const readJson = (p: string): unknown => JSON.parse(readFileSync(p, 'utf8'));
-const readDir = (d: string) =>
-  readdirSync(d).filter((f) => f.endsWith('.json')).sort().map((f) => readJson(join(d, f)));
-
 async function main() {
   const { pos, opt } = args();
   const [projectDir, outPath] = pos;
   if (!projectDir || !outPath) throw new Error('usage: render <projectDir> <out.mp4|out.png> [--scale s] [--fps 30|60] [--frame n]');
 
-  const bundle = parseBundle({
-    project: readJson(join(projectDir, 'project.json')),
-    sets: readDir(join(projectDir, 'sets')),
-    shots: readDir(join(projectDir, 'shots')),
-  });
+  const { bundle, voiceover } = loadProject(projectDir);
   const scale = Number(opt.scale ?? 1);
   const fps = Number(opt.fps ?? bundle.project.fps);
   const width = Math.round((bundle.project.width * scale) / 2) * 2;
@@ -78,9 +73,13 @@ async function main() {
       return;
     }
 
+    const audio = opt.audio ?? voiceover;
     const ff = spawn('ffmpeg', [
       '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'png', '-i', '-',
-      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', '-movflags', '+faststart', outPath,
+      ...(audio ? ['-i', audio] : []),
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'medium', '-movflags', '+faststart',
+      ...(audio ? ['-c:a', 'aac', '-b:a', '192k', '-shortest'] : []),
+      outPath,
     ], { stdio: ['pipe', 'inherit', 'inherit'] });
     const done = new Promise<void>((res, rej) => {
       ff.on('close', (c) => (c === 0 ? res() : rej(new Error(`ffmpeg exited ${c}`))));

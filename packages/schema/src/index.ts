@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { resolveShots, type Alignment } from './alignment';
+
+export * from './alignment';
 
 /** All timing rules are authored at this rate; JSON stores seconds, never frames. */
 export const CANONICAL_FPS = 30;
@@ -74,23 +77,39 @@ export const Actor = z.object({
   scale: z.number().default(1),
 });
 
-export const ActorEvent = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('gesture'),
-    actor: Id,
-    /** Time of the spoken word this gesture belongs to (seconds, project timeline). */
-    at: z.number(),
-    gesture: GestureKind,
-    hand: z.enum(['left', 'right']).default('right'),
-    hold: z.number().default(0.8),
-  }),
-  z.object({
-    type: z.literal('expression'),
-    actor: Id,
-    at: z.number(),
-    expression: ExpressionId,
-  }),
-]);
+/**
+ * A point on the voiceover, by word instead of by hand-typed seconds.
+ * `word` may be a phrase ("the window"); `nth` picks the nth occurrence.
+ */
+export const Anchor = z.object({
+  word: z.string().min(1),
+  nth: z.number().int().positive().default(1),
+  edge: z.enum(['start', 'end']).default('start'),
+  /** Extra seconds added after resolving (usually 0; gesture lead is applied by the engine). */
+  offset: z.number().default(0),
+});
+export const TimeRef = z.union([z.number(), Anchor]);
+
+const makeActorEvent = <T extends z.ZodTypeAny>(time: T) =>
+  z.discriminatedUnion('type', [
+    z.object({
+      type: z.literal('gesture'),
+      actor: Id,
+      /** Time of the spoken word this gesture belongs to (seconds, project timeline). */
+      at: time,
+      gesture: GestureKind,
+      hand: z.enum(['left', 'right']).default('right'),
+      hold: z.number().default(0.8),
+    }),
+    z.object({
+      type: z.literal('expression'),
+      actor: Id,
+      at: time,
+      expression: ExpressionId,
+    }),
+  ]);
+export const ActorEvent = makeActorEvent(z.number());
+export const ActorEventSource = makeActorEvent(TimeRef);
 
 export const Camera = z.object({
   position: Vec3,
@@ -105,16 +124,31 @@ export const Transition = z.object({
   frames: z.number().int().positive().default(6),
 });
 
-export const Shot = z.object({
+const shotBase = {
   id: Id,
   set: Id,
-  /** Absolute start on the project timeline, seconds. */
-  start: z.number().nonnegative(),
-  duration: z.number().positive(),
   camera: Camera,
   actors: z.array(Actor).default([]),
-  events: z.array(ActorEvent).default([]),
   transitionIn: Transition.default({ type: 'cut', frames: 6 }),
+};
+
+/** What the engine renders: every time is absolute seconds on the project timeline. */
+export const Shot = z.object({
+  ...shotBase,
+  start: z.number().nonnegative(),
+  duration: z.number().positive(),
+  events: z.array(ActorEvent).default([]),
+});
+
+/**
+ * What files on disk contain: times may be word anchors, and `duration` may be
+ * omitted (the shot then runs until the next shot starts).
+ */
+export const ShotSource = z.object({
+  ...shotBase,
+  start: z.union([z.number().nonnegative(), Anchor]),
+  duration: z.number().positive().optional(),
+  events: z.array(ActorEventSource).default([]),
 });
 
 // ---------------------------------------------------------------- project
@@ -134,6 +168,9 @@ export type Project = z.infer<typeof Project>;
 export type SetDef = z.infer<typeof SetDef>;
 export type SetObject = z.infer<typeof SetObject>;
 export type Shot = z.infer<typeof Shot>;
+export type ShotSource = z.infer<typeof ShotSource>;
+export type Anchor = z.infer<typeof Anchor>;
+export type TimeRef = z.infer<typeof TimeRef>;
 export type Actor = z.infer<typeof Actor>;
 export type ActorEvent = z.infer<typeof ActorEvent>;
 export type Camera = z.infer<typeof Camera>;
@@ -158,11 +195,10 @@ export class BundleError extends Error {
  * Validate raw JSON (project.json + sets/*.json + shots/*.json) into a Bundle,
  * including cross-references the per-file schemas cannot check.
  */
-export function parseBundle(raw: {
-  project: unknown;
-  sets: unknown[];
-  shots: unknown[];
-}): Bundle {
+export function parseBundle(
+  raw: { project: unknown; sets: unknown[]; shots: unknown[] },
+  opts: { alignment?: Alignment } = {},
+): Bundle {
   const issues: string[] = [];
   const check = <T>(schema: z.ZodType<T>, value: unknown, label: string): T | undefined => {
     const r = schema.safeParse(value);
@@ -173,16 +209,20 @@ export function parseBundle(raw: {
 
   const project = check(Project, raw.project, 'project.json');
   const sets: Record<string, SetDef> = {};
-  const shots: Record<string, Shot> = {};
+  const sources: Record<string, ShotSource> = {};
   raw.sets.forEach((s, i) => {
     const v = check(SetDef, s, `sets[${i}]`);
     if (v) sets[v.id] = v;
   });
   raw.shots.forEach((s, i) => {
-    const v = check(Shot, s, `shots[${i}]`);
-    if (v) shots[v.id] = v;
+    const v = check(ShotSource, s, `shots[${i}]`);
+    if (v) sources[v.id] = v;
   });
   if (!project) throw new BundleError(issues);
+
+  const resolved = resolveShots(sources, project.shots, opts.alignment);
+  issues.push(...resolved.issues);
+  const shots = resolved.shots;
 
   for (const id of project.sets) if (!sets[id]) issues.push(`project lists set "${id}" but no such set was loaded`);
   for (const id of project.shots) if (!shots[id]) issues.push(`project lists shot "${id}" but no such shot was loaded`);
