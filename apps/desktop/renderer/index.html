@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShortStudio</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header>
+    <strong class="brand">ShortStudio</strong>
+    <button id="open">Open project…</button>
+    <span id="project-name"></span>
+    <span class="spacer"></span>
+    <button id="undo" disabled title="Undo the last applied edit (Ctrl+Z)">Undo</button>
+    <button id="redo" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
+    <button id="export" disabled>Export MP4</button>
+    <button id="settings" title="Model settings">⚙</button>
+  </header>
+
+  <main>
+    <section id="viewport">
+      <div id="stage-wrap"><canvas id="stage"></canvas><div id="empty">Open a project to begin.<br />Click anything in the picture to edit it.</div></div>
+    </section>
+
+    <aside>
+      <div id="edit-panel" hidden>
+        <h2 id="target-label"></h2>
+        <textarea id="prompt" rows="4" placeholder="What should change? e.g. “make the counter say dollars” or “move the window to the left wall”"></textarea>
+        <div class="row">
+          <button id="submit" class="primary">Edit this shot</button>
+          <button id="clear">Clear selection</button>
+        </div>
+        <p id="hint">Only this shot's file is changed. You see the diff before anything is saved.</p>
+      </div>
+
+      <div id="proposal" hidden>
+        <h2>Proposed change <small id="proposal-meta"></small></h2>
+        <pre id="diff"></pre>
+        <ul id="issues"></ul>
+        <div class="row">
+          <button id="apply" class="primary">Apply</button>
+          <button id="discard">Discard</button>
+        </div>
+      </div>
+
+      <div id="busy" hidden><div class="spinner"></div><span id="busy-text"></span></div>
+
+      <h3>History</h3>
+      <ol id="history"><li class="none">No edits yet.</li></ol>
+      <p id="status" role="status"></p>
+    </aside>
+  </main>
+
+  <footer>
+    <button id="play" disabled>▶</button>
+    <div id="timeline-wrap">
+      <input id="timeline" type="range" min="0" max="1" step="0.0333333" value="0" disabled />
+      <div id="ticks"></div>
+    </div>
+    <span id="time">0.00 / 0.00 s</span>
+  </footer>
+
+  <dialog id="settings-dialog">
+    <form method="dialog">
+      <h2>Model settings</h2>
+      <p>Which model rewrites shots when you edit.</p>
+      <label>Backend
+        <select id="s-provider"><option value="cli">Local CLI (Claude Code, Gemini CLI…)</option><option value="api">Claude API</option></select>
+      </label>
+      <label>CLI command <input id="s-cli" placeholder="claude" /></label>
+      <label>CLI arguments <input id="s-cli-args" placeholder="-p" /></label>
+      <label>API model <input id="s-model" placeholder="claude-opus-5-5" /></label>
+      <label>API key <input id="s-key" type="password" placeholder="(stored encrypted; leave blank to keep)" autocomplete="off" /></label>
+      <p id="s-key-state"></p>
+      <div class="row"><button id="s-save" class="primary" value="save">Save</button><button value="cancel">Cancel</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

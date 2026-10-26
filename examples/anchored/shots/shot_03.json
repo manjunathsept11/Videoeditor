@@ -1,0 +1,57 @@
+{
+  "id": "shot_03",
+  "set": "neon_street",
+  "start": {
+    "word": "makes"
+  },
+  "camera": {
+    "position": [
+      4.5,
+      1.3,
+      8.5
+    ],
+    "target": [
+      0,
+      1.6,
+      0
+    ],
+    "fov": 40
+  },
+  "transitionIn": {
+    "type": "dissolve",
+    "frames": 6
+  },
+  "actors": [
+    {
+      "id": "mio",
+      "bodyColor": "#7a4dff",
+      "position": [
+        0.3,
+        0,
+        0.5
+      ],
+      "facingY": -0.6,
+      "glasses": true
+    }
+  ],
+  "events": [
+    {
+      "type": "gesture",
+      "actor": "mio",
+      "at": {
+        "word": "legal"
+      },
+      "gesture": "raise",
+      "hand": "right",
+      "hold": 0.6
+    },
+    {
+      "type": "expression",
+      "actor": "mio",
+      "at": {
+        "word": "legal"
+      },
+      "expression": "happy"
+    }
+  ]
+}

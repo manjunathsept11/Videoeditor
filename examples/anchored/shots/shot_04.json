@@ -1,0 +1,46 @@
+{
+  "id": "shot_04",
+  "set": "pachinko_hall",
+  "start": {
+    "word": "Pachinko"
+  },
+  "camera": {
+    "position": [
+      -2.2,
+      1.5,
+      6.2
+    ],
+    "target": [
+      0,
+      1.7,
+      0
+    ],
+    "fov": 40
+  },
+  "transitionIn": {
+    "type": "cut",
+    "frames": 6
+  },
+  "actors": [
+    {
+      "id": "ken",
+      "bodyColor": "#ff7a1a",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "facingY": 0.1
+    }
+  ],
+  "events": [
+    {
+      "type": "expression",
+      "actor": "ken",
+      "at": {
+        "word": "cash"
+      },
+      "expression": "panic"
+    }
+  ]
+}

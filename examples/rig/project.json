@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "Rig demo",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "sets": [
+    "neon_street"
+  ],
+  "shots": [
+    "shot_01"
+  ],
+  "captions": {
+    "enabled": false
+  }
+}

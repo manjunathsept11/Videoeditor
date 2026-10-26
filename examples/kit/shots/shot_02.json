@@ -1,0 +1,47 @@
+{
+  "id": "shot_02",
+  "set": "prize_shop",
+  "start": 2.0,
+  "duration": 2.0,
+  "camera": {
+    "position": [
+      0,
+      2.0,
+      10.5
+    ],
+    "target": [
+      0,
+      1.8,
+      0
+    ],
+    "fov": 42
+  },
+  "actors": [
+    {
+      "id": "ken",
+      "bodyColor": "#ff7a1a",
+      "position": [
+        -0.9,
+        0,
+        0
+      ],
+      "facingY": 0.25
+    },
+    {
+      "id": "mio",
+      "bodyColor": "#7a4dff",
+      "position": [
+        0.9,
+        0,
+        0.3
+      ],
+      "facingY": -0.25,
+      "glasses": true
+    }
+  ],
+  "events": [],
+  "transitionIn": {
+    "type": "cut",
+    "frames": 6
+  }
+}

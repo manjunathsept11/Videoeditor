@@ -1,0 +1,60 @@
+{
+  "id": "shot_01",
+  "set": "neon_street",
+  "start": 0,
+  "camera": {
+    "position": [
+      0,
+      1.6,
+      11.5
+    ],
+    "target": [
+      0,
+      2.0,
+      -3
+    ],
+    "fov": 44
+  },
+  "actors": [
+    {
+      "id": "ken",
+      "bodyColor": "#ff7a1a",
+      "position": [
+        -0.6,
+        0,
+        1.2
+      ],
+      "facingY": 0.25
+    },
+    {
+      "id": "mio",
+      "bodyColor": "#7a4dff",
+      "position": [
+        0.9,
+        0,
+        0.6
+      ],
+      "facingY": -0.3,
+      "glasses": true
+    }
+  ],
+  "events": [
+    {
+      "type": "expression",
+      "actor": "ken",
+      "at": {
+        "word": "bans"
+      },
+      "expression": "happy"
+    },
+    {
+      "type": "gesture",
+      "actor": "ken",
+      "at": {
+        "word": "gambling"
+      },
+      "gesture": "point",
+      "hand": "right"
+    }
+  ]
+}

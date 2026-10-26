@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "Set kit demo",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "sets": [
+    "hall",
+    "prize_shop",
+    "back_alley"
+  ],
+  "shots": [
+    "shot_01",
+    "shot_02",
+    "shot_03"
+  ],
+  "captions": {
+    "enabled": false
+  }
+}
